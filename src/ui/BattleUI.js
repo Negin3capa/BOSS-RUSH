@@ -17,23 +17,32 @@ export function createBattleUI(gameState) {
             k.pos(pos.x, pos.y),
         ]);
 
-        // Selection Border (Red) - Behind the main box
+        // Selection Border (Red)
         const selectionBorder = container.add([
             k.rect(210, 120),
             k.pos(-5, -5),
-            k.color(COLORS.hp), // Red selection
+            k.color(COLORS.hp),
             k.z(-1),
         ]);
         selectionBorder.hidden = true;
 
         // Window Background (White)
-        container.add([
+        const mainBox = container.add([
             k.rect(200, 110),
             k.color(COLORS.uiBackground),
             k.outline(UI.OUTLINE, COLORS.uiBorder),
         ]);
 
-        // Name Tag Box (Black tab)
+        // Fallen Overlay (Grey semi-transparent)
+        const fallenOverlay = container.add([
+            k.rect(200, 110),
+            k.color(100, 100, 120),
+            k.opacity(0.5),
+            k.z(10),
+        ]);
+        fallenOverlay.hidden = true;
+
+        // Name Tag Box
         container.add([
             k.rect(180, 25),
             k.pos(10, -15),
@@ -115,28 +124,25 @@ export function createBattleUI(gameState) {
             k.color(COLORS.text),
         ]);
 
-        // Status Overlay
-        container.add([
-            k.text("", { size: 14, font: "Viga" }),
-            k.pos(190, 100),
+        // Status Icons (Shield)
+        const shieldIcon = container.add([
+            k.text("🛡️", { size: 24 }),
+            k.pos(195, 105),
             k.anchor("botright"),
-            k.color(COLORS.text),
             k.z(102),
-            {
-                update() {
-                    if (char.isDead) {
-                        this.text = "FALLEN";
-                        this.color = COLORS.hp;
-                    } else if (char.isDefending) {
-                        this.text = "SHIELDED";
-                        this.color = COLORS.sp;
-                    } else {
-                        this.text = "NEUTRAL";
-                        this.color = COLORS.text;
-                    }
-                }
-            }
         ]);
+        shieldIcon.hidden = true;
+
+        // Auto-update visuals based on character state
+        container.onUpdate(() => {
+            shieldIcon.hidden = !char.isDefending || char.isDead;
+            fallenOverlay.hidden = !char.isDead;
+            if (char.isDead) {
+                mainBox.color = k.rgb(150, 150, 160); // Dim the background
+            } else {
+                mainBox.color = k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
+            }
+        });
 
         portraitUIs.push({ selectionBorder });
     });
@@ -171,9 +177,12 @@ export function createMessageLog() {
         k.z(101),
         k.scale(1),
         {
-            updateLog(msg) {
+            updateLog(msg, noPunch = false) {
+                if (this.text === msg) return; // Ignore identical messages to avoid jitter
                 this.text = msg;
-                this.scale = k.vec2(UI.PUNCH_SCALE);
+                if (!noPunch) {
+                    this.scale = k.vec2(UI.PUNCH_SCALE);
+                }
             },
             update() {
                 this.scale = k.lerp(this.scale, k.vec2(1), k.dt() * 8);

@@ -18,6 +18,9 @@ export default function BattleScene() {
     let endOptionIndex = 0;
     let selectedActionIndex = 0;
 
+    // Command Memory
+    let lastActionIndexDuringTurn = 0;
+
     // Background Nebula
     const bg = k.add([
         k.sprite("nebula"),
@@ -93,7 +96,6 @@ export default function BattleScene() {
         return sprite;
     });
 
-    // Selection Cursors
     const targetCursor = k.add([
         k.text("▼", { size: 40 }),
         k.pos(0, 0),
@@ -126,6 +128,47 @@ export default function BattleScene() {
             battleUI.updateSelection(-1);
             targetCursor.hidden = true;
         }
+    }
+
+    // Particle Helper
+    function spawnParticles(pos, charType, color) {
+        if (!pos) return;
+        for (let i = 0; i < 12; i++) {
+            k.add([
+                k.text(charType, { size: k.rand(24, 40) }),
+                k.pos(pos.x + k.rand(-50, 50), pos.y + k.rand(-50, 50)),
+                k.color(color),
+                k.opacity(1),
+                k.anchor("center"),
+                k.z(300),
+                k.move(charType === "↓" ? 90 : 270, k.rand(50, 150)),
+                {
+                    update() {
+                        this.opacity -= k.dt() * 1.5;
+                        if (this.opacity <= 0) k.destroy(this);
+                    }
+                }
+            ]);
+        }
+    }
+
+    function getTargetPos(target) {
+        if (!target || target === "ALL_ENEMIES" || target === "ALL_ALLIES") {
+            return k.vec2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+        }
+
+        const enemyIdx = gameState.enemies.indexOf(target);
+        if (enemyIdx !== -1) {
+            return enemySprites[enemyIdx].pos;
+        }
+
+        const partyIdx = gameState.party.indexOf(target);
+        if (partyIdx !== -1) {
+            const layoutPos = LAYOUT.POSITIONS[partyIdx];
+            return k.vec2(layoutPos.x + 100, layoutPos.y + 50);
+        }
+
+        return k.vec2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
     }
 
     // Input Handling
@@ -194,6 +237,7 @@ export default function BattleScene() {
 
     k.onKeyPress("space", () => {
         if (turnPhase === "PLAYER_INPUT") {
+            lastActionIndexDuringTurn = selectedActionIndex;
             handleActionSelection(actions[selectedActionIndex]);
         } else if (turnPhase === "SELECT_SKILL") {
             handleSkillSelection();
@@ -216,7 +260,7 @@ export default function BattleScene() {
     function updateMenuVisuals() {
         if (turnPhase === "PLAYER_INPUT") {
             const hero = gameState.party[currentHeroIndex];
-            log.updateLog(`What will ${hero.name} do?`);
+            log.updateLog(`What will ${hero.name} do?`, true);
             menuSystem.show();
             menuSystem.updateMainMenu(selectedActionIndex);
         } else if (turnPhase === "SELECT_SKILL") {
@@ -274,7 +318,8 @@ export default function BattleScene() {
 
     function nextHero() {
         currentHeroIndex++;
-        selectedActionIndex = 0;
+        // Use memory for next hero
+        selectedActionIndex = lastActionIndexDuringTurn;
         selectedSkillIndex = 0;
         selectedAction = null;
 
@@ -286,6 +331,7 @@ export default function BattleScene() {
         } else {
             turnPhase = "PLAYER_INPUT";
             updateMenuVisuals();
+            log.updateLog(`What will ${gameState.party[currentHeroIndex].name} do?`, false);
         }
     }
 
@@ -315,14 +361,20 @@ export default function BattleScene() {
         else if (roll < 0.6 && enemy.sp >= 10) {
             const skill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
             const targetGroup = (skill.target === "ONE_ALLY" || skill.target === "ALL_ALLIES") ? gameState.enemies.filter(e => !e.isDead) : aliveHeroes;
-            const target = targetGroup[Math.floor(Math.random() * targetGroup.length)];
-            await performAction({ type: "SKILL", source: enemy, target, skill });
-        } else await performAction({ type: "FIGHT", source: enemy, target: aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)] });
+            if (targetGroup.length > 0) {
+                const target = targetGroup[Math.floor(Math.random() * targetGroup.length)];
+                await performAction({ type: "SKILL", source: enemy, target, skill });
+            }
+        } else if (aliveHeroes.length > 0) {
+            await performAction({ type: "FIGHT", source: enemy, target: aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)] });
+        }
     }
 
     async function performAction(action) {
         const { type, source, target, skill } = action;
         log.updateLog(`${source.name} uses ${type === "SKILL" ? skill.name : type}!`);
+
+        const targetPos = getTargetPos(target);
 
         if (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage")) {
             const targets = (target === "ALL_ENEMIES") ? gameState.enemies.filter(e => !e.isDead) :
@@ -330,23 +382,49 @@ export default function BattleScene() {
 
             targets.forEach(t => {
                 if (!t) return;
-                const basePower = type === "FIGHT" ? source.attack : source.attack + skill.power;
-                t.takeDamage(basePower, type === "SKILL" ? skill.attribute : source.attribute);
+                const basePower = (type === "FIGHT" || !skill) ? source.attack : source.attack + skill.power;
+                t.takeDamage(basePower, (type === "SKILL" && skill) ? skill.attribute : source.attribute);
             });
             shakeScreen(5);
-        } else if (type === "DEFEND") source.defend();
-        else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
+        } else if (type === "DEFEND") {
+            source.defend();
+            spawnParticles(targetPos, "↑", [255, 255, 150]);
+        } else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
+            const amount = skill ? skill.power : 50;
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
-            targets.forEach(t => t.heal(skill ? skill.power : 50));
+            targets.forEach(t => {
+                if (!t) return;
+                t.heal(amount);
+                spawnParticles(getTargetPos(t), "+", [100, 255, 100]);
+            });
+            if (skill) {
+                await k.wait(0.4);
+                log.updateLog(`${source.name} used ${skill.name}. ${target.name || "Party"} healed ${amount} HP!`);
+            }
         } else if (type === "SKILL" && (skill.type === "Buff" || skill.type === "Debuff")) {
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) :
                 (target === "ALL_ENEMIES") ? gameState.enemies.filter(e => !e.isDead) : [target];
+
+            const isBuff = skill.type === "Buff";
+            const charType = isBuff ? "↑" : "↓";
+            let color = [255, 255, 255];
+
+            if (skill.effect.stat === "attack") color = [240, 80, 120];
+            if (skill.effect.stat === "defense") color = [255, 255, 150];
+            if (skill.effect.stat === "speed") color = [80, 240, 210];
+
             targets.forEach(t => {
+                if (!t) return;
                 if (skill.effect) {
                     if (skill.effect.stat === "attack") t.attack = Math.floor(t.attack * skill.effect.amount);
                     if (skill.effect.stat === "defense") t.defense = Math.floor(t.defense * skill.effect.amount);
                 }
+                spawnParticles(getTargetPos(t), charType, color);
             });
+
+            await k.wait(0.4);
+            const change = isBuff ? "increased" : "decreased";
+            log.updateLog(`${source.name} used ${skill.name}. ${target.name || "Target"}'s ${skill.effect.stat} ${change}!`);
         }
 
         if (type === "SKILL" && skill) source.costSp(skill.spCost);
@@ -363,6 +441,7 @@ export default function BattleScene() {
         playerActions = [];
         currentHeroIndex = 0;
         selectedActionIndex = 0;
+        lastActionIndexDuringTurn = 0;
         selectedSkillIndex = 0;
         while (currentHeroIndex < gameState.party.length && gameState.party[currentHeroIndex].isDead) currentHeroIndex++;
         turnPhase = "PLAYER_INPUT";
@@ -383,7 +462,6 @@ export default function BattleScene() {
 
         const btns = [retry, quit];
 
-        // Simple loop for highlights
         k.onUpdate(() => {
             btns.forEach((b, i) => {
                 b.color = i === endOptionIndex ? k.rgb(COLORS.highlight[0], COLORS.highlight[1], COLORS.highlight[2]) : k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
