@@ -14,16 +14,26 @@ export const ATTRIBUTES = {
 };
 
 export const COLORS = {
-    background: [20, 20, 30],
-    uiBackground: [40, 40, 50],
-    text: [255, 255, 255],
-    highlight: [255, 215, 0], // Gold
-    hp: [220, 50, 50],
-    sp: [50, 150, 220],
+    background: [10, 10, 15],      // Much darker
+    uiBackground: [25, 25, 30],    // Dark grey
+    text: [240, 240, 240],        // Off-white
+    highlight: [255, 215, 0],     // Gold
+    hp: [255, 70, 70],            // Brighter Red
+    sp: [70, 150, 255],           // Brighter Blue
     enemy: [200, 100, 100],
     player: [100, 200, 100],
-    uiBorder: [255, 255, 255],
+    uiBorder: [240, 240, 240],
+    shadow: [0, 0, 0],
 };
+
+export const UI = {
+    OUTLINE: 4,
+    SHADOW: 6,
+    PUNCH_SCALE: 1.2,
+    WOBBLE_SPEED: 8,
+    WOBBLE_FORCE: 0.1,
+};
+
 
 export const ATTRIBUTE_COLORS = {
     [ATTRIBUTES.PHYSICAL]: [255, 255, 255], // White

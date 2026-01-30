@@ -1,6 +1,6 @@
 import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
-import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES } from "../constants";
+import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
 import { createBattleUI, createMessageLog, createTurnCounter, createMenuSystem } from "../ui/BattleUI";
 
 export default function BattleScene() {
@@ -15,6 +15,7 @@ export default function BattleScene() {
     let selectedAction = null; // Store currently selected action
     let selectedSkillIndex = 0; // For Skill Menu
     let selectedEnemyIndex = 0; // For targeting cursor
+    let endOptionIndex = 0; // 0: Retry, 1: Give Up
 
     // UI Elements
     createBattleUI(gameState);
@@ -32,28 +33,52 @@ export default function BattleScene() {
             k.pos(LAYOUT.ENEMY_CENTER_X + xOffset, LAYOUT.ENEMY_CENTER_Y),
             k.color(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy),
             k.anchor("center"),
+            k.outline(UI.OUTLINE, COLORS.uiBorder), // Sketchy outline
+            k.scale(1),
+            k.rotate(0),
             "enemy",
-            { char: enemy, id: i }
+            {
+                char: enemy,
+                id: i,
+                update() {
+                    if (!this.char.isDead) {
+                        this.angle = Math.sin(k.time() * 1.5 + i) * 1.5; // Reduced wobble
+                        this.scale = k.vec2(1 + Math.sin(k.time() * 2 + i) * 0.015); // Breathing effect
+                    } else {
+                        this.angle = 0;
+                        this.scale = k.vec2(1);
+                    }
+                }
+            }
         ]);
 
         // Enemy HP Bar (Attached to Sprite)
-        // Background
+        // Shadow/Bg
         sprite.add([
-            k.rect(80, 8),
-            k.pos(0, -60), // Above head (0,0 is center of 100x100 -> top is -50)
+            k.rect(80, 10),
+            k.pos(UI.SHADOW, -60 + UI.SHADOW),
             k.anchor("center"),
-            k.color(0, 0, 0),
+            k.color(COLORS.shadow),
+        ]);
+
+        // Frame
+        sprite.add([
+            k.rect(80, 10),
+            k.pos(0, -60),
+            k.anchor("center"),
+            k.color(COLORS.uiBackground),
+            k.outline(2, COLORS.uiBorder),
         ]);
 
         // Fill
         sprite.add([
-            k.rect(80, 8),
-            k.pos(-40, -60), // Start from left edge relative to center
+            k.rect(80, 10),
+            k.pos(-40, -60), // Relative to sprite center
             k.color(COLORS.hp),
             {
                 update() {
                     const ratio = enemy.hp / enemy.maxHp;
-                    this.width = ratio * 80;
+                    this.width = k.lerp(this.width, ratio * 80, k.dt() * 10);
                 }
             }
         ]);
@@ -194,10 +219,37 @@ export default function BattleScene() {
         } else if (turnPhase === "SELECT_TARGET") {
             confirmTarget();
         } else if (turnPhase === "END") {
-            // Retry logic
-            gameRestart();
+            if (endOptionIndex === 0) {
+                gameRestart();
+            } else {
+                k.go("main");
+            }
         }
     });
+
+    k.onKeyPress("left", () => {
+        if (turnPhase === "END") {
+            endOptionIndex = 0;
+            updateEndVisuals();
+        }
+    });
+
+    k.onKeyPress("right", () => {
+        if (turnPhase === "END") {
+            endOptionIndex = 1;
+            updateEndVisuals();
+        }
+    });
+
+    let endButtons = [];
+    function updateEndVisuals() {
+        if (turnPhase !== "END") return;
+        endButtons.forEach((btn, i) => {
+            const label = i === 0 ? "Retry" : "Give Up";
+            btn.text = i === endOptionIndex ? `> ${label} <` : label;
+            btn.color = i === endOptionIndex ? COLORS.highlight : COLORS.text;
+        });
+    }
 
     k.onKeyPress("backspace", () => {
         if (turnPhase === "SELECT_SKILL") {
@@ -614,30 +666,50 @@ export default function BattleScene() {
     function endGame(win) {
         turnPhase = "END";
         const msg = win ? "VICTORY!" : "GAME OVER";
-        log.updateLog(msg + " Press SPACE to Retry");
+        log.updateLog(msg);
 
+        // Backdrop
         k.add([
             k.rect(SCREEN_WIDTH, SCREEN_HEIGHT),
             k.color(0, 0, 0),
-            k.opacity(0.6),
+            k.opacity(0.8),
             k.z(500),
         ]);
 
+        // Title
         k.add([
-            k.text(msg, { size: 60 }),
-            k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20),
+            k.text(msg, { size: 80, font: "Viga" }),
+            k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60),
             k.anchor("center"),
             k.color(win ? COLORS.highlight : COLORS.hp),
             k.z(501),
+            k.scale(1),
+            {
+                update() {
+                    this.scale = k.vec2(1 + Math.sin(k.time() * 5) * 0.05);
+                }
+            }
         ]);
 
-        k.add([
-            k.text("Press SPACE to Retry", { size: 24 }),
-            k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 50),
+        const btnRetry = k.add([
+            k.text("Retry", { size: 32, font: "Viga" }),
+            k.pos(SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 80),
+            k.anchor("center"),
+            k.color(COLORS.highlight),
+            k.z(502),
+        ]);
+
+        const btnQuit = k.add([
+            k.text("Give Up", { size: 32, font: "Viga" }),
+            k.pos(SCREEN_WIDTH / 2 + 120, SCREEN_HEIGHT / 2 + 80),
             k.anchor("center"),
             k.color(COLORS.text),
-            k.z(501),
+            k.z(502),
         ]);
+
+        endButtons = [btnRetry, btnQuit];
+        endOptionIndex = 0;
+        updateEndVisuals();
     }
 
     function gameRestart() {
