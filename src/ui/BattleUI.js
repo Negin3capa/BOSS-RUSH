@@ -85,10 +85,16 @@ export function createBattleUI(gameState) {
             }
         ]);
 
-        container.add([
-            k.text(`${Math.ceil(char.hp)}/${char.maxHp}`, { size: 12, font: "Inter" }),
+        const hpText = container.add([
+            k.text(`${Math.floor(char.hp)}/${char.maxHp}`, { size: 12, font: "Inter" }),
             k.pos(barX + 25, hpY + 16),
             k.color(COLORS.text),
+            {
+                update() {
+                    const currentHp = Math.max(0, Math.floor(char.hp));
+                    this.text = `${currentHp}/${char.maxHp}`;
+                }
+            }
         ]);
 
         // SP Bar
@@ -118,11 +124,43 @@ export function createBattleUI(gameState) {
             }
         ]);
 
-        container.add([
-            k.text(`${Math.ceil(char.sp)}/${char.maxSp}`, { size: 12, font: "Inter" }),
+        const spText = container.add([
+            k.text(`${Math.floor(char.sp)}/${char.maxSp}`, { size: 12, font: "Inter" }),
             k.pos(barX + 25, spY + 16),
             k.color(COLORS.text),
+            {
+                update() {
+                    const currentSp = Math.max(0, Math.floor(char.sp));
+                    this.text = `${currentSp}/${char.maxSp}`;
+                }
+            }
         ]);
+
+        // Status Indicators (Arrows)
+        const statusContainer = container.add([
+            k.pos(25, -15), // Top of the name tag box, left side
+        ]);
+
+        const statusIcons = ["attack", "defense"].map((stat, i) => {
+            return statusContainer.add([
+                k.text("", { size: 24, font: "Viga" }),
+                k.pos(i * 20, 0),
+                k.anchor("center"),
+                k.outline(2, [255, 255, 255]),
+                {
+                    update() {
+                        const effect = char.statusEffects.find(e => e.stat === stat);
+                        if (effect) {
+                            this.text = effect.type === "BUFF" ? "^" : "v";
+                            if (stat === "attack") this.color = k.rgb(240, 80, 120);
+                            if (stat === "defense") this.color = k.rgb(100, 150, 255); // Changed defense color slightly for better visibility
+                        } else {
+                            this.text = "";
+                        }
+                    }
+                }
+            ]);
+        });
 
         // Status Icons (Shield)
         const shieldIcon = container.add([

@@ -21,12 +21,51 @@ export class BaseCharacter {
 
         this.isDead = false;
         this.isDefending = false;
+        this.statusEffects = []; // { stat: 'attack'|'defense', amount: 1.5, duration: 3, type: 'BUFF'|'DEBUFF' }
+    }
+
+    get effectiveAttack() {
+        let multiplier = 1.0;
+        this.statusEffects.forEach(effect => {
+            if (effect.stat === "attack") multiplier *= effect.amount;
+        });
+        return Math.floor(this.attack * multiplier);
+    }
+
+    get effectiveDefense() {
+        let multiplier = 1.0;
+        this.statusEffects.forEach(effect => {
+            if (effect.stat === "defense") multiplier *= effect.amount;
+        });
+        return Math.floor(this.defense * multiplier);
     }
 
     randomizeStat(value) {
         // Random variance between 0.8 and 1.2
         const variance = 0.8 + Math.random() * 0.4;
         return Math.floor(value * variance);
+    }
+
+    addStatusEffect(effectData) {
+        // Find existing effect on same stat
+        const existing = this.statusEffects.find(e => e.stat === effectData.stat);
+        if (existing) {
+            existing.duration = 3; // Refresh/Extend to max
+            existing.amount = effectData.amount; // Update amount if different
+            existing.type = effectData.type;
+        } else {
+            this.statusEffects.push({
+                stat: effectData.stat,
+                amount: effectData.amount,
+                duration: 3,
+                type: effectData.type
+            });
+        }
+    }
+
+    tickStatusEffects() {
+        this.statusEffects.forEach(e => e.duration--);
+        this.statusEffects = this.statusEffects.filter(e => e.duration > 0);
     }
 
     takeDamage(amount, attackAttribute = ATTRIBUTES.PHYSICAL) {
@@ -37,7 +76,7 @@ export class BaseCharacter {
             multiplier = ELEMENTAL_CHART[attackAttribute][this.attribute];
         }
 
-        let actualDamage = (amount * multiplier) - (this.defense / 2); // Damage formula: (Amount * Mult) - (Defense / 2)
+        let actualDamage = (amount * multiplier) - (this.effectiveDefense / 2);
         if (this.isDefending) {
             actualDamage *= GAMEPLAY.DEFEND_DAMAGE_REDUCTION;
         }
@@ -48,6 +87,7 @@ export class BaseCharacter {
         if (this.hp <= 0) {
             this.hp = 0;
             this.isDead = true;
+            this.statusEffects = []; // Clear on death
         }
 
         return { damage: actualDamage, mult: multiplier };
@@ -78,5 +118,6 @@ export class BaseCharacter {
 
     resetTurn() {
         this.isDefending = false;
+        this.tickStatusEffects();
     }
 }

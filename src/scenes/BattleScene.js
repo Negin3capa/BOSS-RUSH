@@ -76,7 +76,7 @@ export default function BattleScene() {
         // Enemy HP Bar frame
         sprite.add([
             k.rect(94, 14),
-            k.pos(0, enemy.isBoss ? -70 : -75),
+            k.pos(0, enemy.isBoss ? -80 : -72), // Lifted up slightly
             k.anchor("center"),
             k.color(COLORS.uiBackground),
             k.outline(2, COLORS.uiBorder),
@@ -85,7 +85,9 @@ export default function BattleScene() {
         // Enemy HP Bar fill
         sprite.add([
             k.rect(90, 10),
-            k.pos(-45, enemy.isBoss ? -70 : -75),
+            k.pos(-45, (enemy.isBoss ? -80 : -72) - 5), // Corrected alignment: shift up by (14-10)/2 + 3 (approx) wait. 
+            // Frame is center at Y, so frame baseline is Y-7. Fill is 10 high topleft. 
+            // To center 10 in 14, fill should be at Y-5.
             k.color(COLORS.hp),
             {
                 update() {
@@ -94,6 +96,32 @@ export default function BattleScene() {
                 }
             }
         ]);
+
+        // Status Indicators for Enemies
+        const statusContainer = sprite.add([
+            k.pos(0, enemy.isBoss ? -110 : -100),
+            k.anchor("center"),
+        ]);
+
+        ["attack", "defense"].forEach((stat, idx) => {
+            statusContainer.add([
+                k.text("", { size: 24 }),
+                k.pos((idx - 0.5) * 40, 0),
+                k.anchor("center"),
+                {
+                    update() {
+                        const effect = enemy.statusEffects.find(e => e.stat === stat);
+                        if (effect) {
+                            this.text = effect.type === "BUFF" ? "^" : "v";
+                            if (stat === "attack") this.color = k.rgb(240, 80, 120);
+                            if (stat === "defense") this.color = k.rgb(255, 255, 150);
+                        } else {
+                            this.text = "";
+                        }
+                    }
+                }
+            ]);
+        });
 
         return sprite;
     });
@@ -444,8 +472,11 @@ export default function BattleScene() {
             targets.forEach(t => {
                 if (!t || t.isDead) return;
                 if (skill.effect) {
-                    if (skill.effect.stat === "attack") t.attack = Math.floor(t.attack * skill.effect.amount);
-                    if (skill.effect.stat === "defense") t.defense = Math.floor(t.defense * skill.effect.amount);
+                    t.addStatusEffect({
+                        stat: skill.effect.stat,
+                        amount: skill.effect.amount,
+                        type: isBuff ? "BUFF" : "DEBUFF"
+                    });
                 }
                 spawnParticles(getTargetPos(t), charType, color);
             });
