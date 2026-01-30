@@ -80,7 +80,7 @@ export class GameState {
         if (type === "Stronger") {
             base = { hp: 100, sp: 60, attack: 25, defense: 10 };
         } else if (type === "Boss") {
-            base = { hp: 500, sp: 200, attack: 40, defense: 20 };
+            base = { hp: 400, sp: 200, attack: 35, defense: 15 };
         }
 
         // Apply scaling

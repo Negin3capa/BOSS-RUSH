@@ -52,19 +52,24 @@ export default function BattleScene() {
         const container = k.add([
             k.pos(LAYOUT.ENEMY_CENTER_X + xOffset, LAYOUT.ENEMY_CENTER_Y),
             k.anchor("center"),
+            k.opacity(1),
             "enemy",
             {
                 char: enemy,
                 id: i,
                 update() {
                     const baseScale = enemy.isBoss ? 2.5 : 1;
+                    const visual = this.get("visual")[0];
                     if (!this.char.isDead) {
                         this.angle = Math.sin(k.time() * 1.0 + i) * 1.2;
                         this.scale = k.vec2(baseScale + Math.sin(k.time() * 2.5 + i) * 0.015);
+                        this.opacity = 1;
+                        if (visual) visual.color = k.rgb(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy));
                     } else {
                         this.angle = 0;
                         this.scale = k.vec2(baseScale);
-                        this.opacity = 0.4;
+                        this.opacity = 0.2;
+                        if (visual) visual.color = k.rgb(100, 100, 120);
                     }
                 }
             }
@@ -85,13 +90,16 @@ export default function BattleScene() {
             k.color(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy)),
             k.anchor("center"),
             k.outline(UI.OUTLINE, COLORS.uiBorder),
+            k.opacity(1),
             k.z(0),
+            "visual", // Tag for easy access
         ]);
 
         // HP Bar Container for conditional visibility
         const hpBar = container.add([
             k.pos(0, enemy.isBoss ? -80 : -100), // Moved non-boss up to -100
             k.z(5),
+            "hpBar",
         ]);
         hpBar.hidden = true;
 
@@ -351,16 +359,14 @@ export default function BattleScene() {
 
     function cycleTarget(dir) {
         if (selectedAction.targetMode === "ALLIES") {
+            const isHealAction = selectedAction.type === "ITEM" || (selectedAction.skill && selectedAction.skill.type === "Heal");
             let tries = 0;
-            // Party navigation: 0=TL, 1=TR, 2=BL, 3=BR
-            // Left/Right is +/- 1 mod 4
-            // Up/Down is +/- 2 mod 4
             do {
                 selectedEnemyIndex = (selectedEnemyIndex + dir + gameState.party.length) % gameState.party.length;
                 tries++;
-            } while (gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
+                // Allow targeting dead if it's a heal action, otherwise skip dead
+            } while (!isHealAction && gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
         } else {
-            // Enemies are in a single row, so up/down doesn't do much but left/right cycles
             let tries = 0;
             do {
                 selectedEnemyIndex = (selectedEnemyIndex + dir + enemySprites.length) % enemySprites.length;
@@ -414,8 +420,16 @@ export default function BattleScene() {
     function startTargeting(type, mode) {
         if (type !== "SKILL") selectedAction = { type };
         selectedAction.targetMode = mode;
-        selectedEnemyIndex = mode === "ENEMIES" ? enemySprites.findIndex(s => !s.sprite.char.isDead) : 0;
-        if (selectedEnemyIndex === -1 && mode === "ENEMIES") selectedEnemyIndex = 0;
+
+        if (mode === "ENEMIES") {
+            selectedEnemyIndex = enemySprites.findIndex(s => !s.sprite.char.isDead);
+        } else {
+            // Allies: If heal, start on first (even if dead). If damage/other, start on first alive.
+            const isHealAction = selectedAction.type === "ITEM" || (selectedAction.skill && selectedAction.skill.type === "Heal");
+            selectedEnemyIndex = gameState.party.findIndex(h => isHealAction || !h.isDead);
+        }
+
+        if (selectedEnemyIndex === -1) selectedEnemyIndex = 0;
         turnPhase = "SELECT_TARGET";
         updateMenuVisuals();
     }
@@ -479,16 +493,21 @@ export default function BattleScene() {
 
     async function enemyTurn(enemy) {
         const aliveHeroes = gameState.party.filter(h => !h.isDead);
+        if (aliveHeroes.length === 0) return; // Should not happen if game over check works
+
         const roll = Math.random();
+        // Enemies only use skills on alive heroes or themselves/allies
         if (roll < 0.2) await performAction({ type: "DEFEND", source: enemy, target: enemy });
         else if (roll < 0.6 && enemy.sp >= 10) {
             const skill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
-            const targetGroup = (skill.target === "ONE_ALLY" || skill.target === "ALL_ALLIES") ? gameState.enemies.filter(e => !e.isDead) : aliveHeroes;
+            const isHealSkill = skill.type === "Heal" || skill.type === "Buff";
+            const targetGroup = isHealSkill ? gameState.enemies.filter(e => !e.isDead) : aliveHeroes;
+
             if (targetGroup.length > 0) {
                 const target = targetGroup[Math.floor(Math.random() * targetGroup.length)];
                 await performAction({ type: "SKILL", source: enemy, target, skill });
             }
-        } else if (aliveHeroes.length > 0) {
+        } else {
             await performAction({ type: "FIGHT", source: enemy, target: aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)] });
         }
     }
@@ -496,8 +515,12 @@ export default function BattleScene() {
     async function performAction(action) {
         let { type, source, target, skill } = action;
 
-        // Reset enemy HP bar visibility
-        enemySprites.forEach(e => e.hpBar.hidden = true);
+        // Reset enemy HP bar visibility and hide all borders
+        enemySprites.forEach(e => {
+            e.hpBar.hidden = true;
+            e.border.hidden = true;
+        });
+        battleUI.updateSelection(-1); // Hide party selection too
 
         // Helper to show target HP bar
         const showTargetHp = (t) => {
@@ -505,8 +528,9 @@ export default function BattleScene() {
             if (idx !== -1) enemySprites[idx].hpBar.hidden = false;
         };
 
-        // Target Redirection Logic: If single target is dead, redirect to another alive target in the same group
-        if (target && target.isDead && target !== "ALL_ENEMIES" && target !== "ALL_ALLIES") {
+        // Target Redirection Logic: If target is invalid (dead for damage, or non-existent), redirect
+        const isHealAction = type === "ITEM" || (skill && skill.type === "Heal");
+        if (target && target.isDead && !isHealAction && target !== "ALL_ENEMIES" && target !== "ALL_ALLIES") {
             const isEnemyGroup = gameState.enemies.includes(target);
             const group = isEnemyGroup ? gameState.enemies : gameState.party;
             const aliveTargets = group.filter(e => !e.isDead);
@@ -588,7 +612,6 @@ export default function BattleScene() {
 
         if (type === "SKILL" && skill) source.costSp(skill.spCost);
 
-        enemySprites.forEach(e => e.sprite.opacity = e.sprite.char.isDead ? 0.3 : 1);
         await k.wait(0.4);
 
         // Hide enemy HP bars after action

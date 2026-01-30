@@ -80,8 +80,8 @@ export function createBattleUI(gameState) {
             k.color(COLORS.hp),
             {
                 update() {
-                    const targetWidth = (char.hp / char.maxHp) * (barWidth - 4);
-                    this.width = k.lerp(this.width, Math.max(0, targetWidth), k.dt() * 10);
+                    const targetWidth = Math.max(0, (char.hp / char.maxHp)) * (barWidth - 4);
+                    this.width = k.lerp(this.width, targetWidth, k.dt() * 10);
                 }
             }
         ]);
@@ -92,8 +92,9 @@ export function createBattleUI(gameState) {
             k.color(COLORS.text),
             {
                 update() {
-                    const currentHp = Math.max(0, Math.floor(char.hp));
+                    const currentHp = Math.floor(char.hp);
                     this.text = `${currentHp}/${char.maxHp}`;
+                    this.color = currentHp <= 0 ? k.rgb(255, 50, 50) : COLORS.text;
                 }
             }
         ]);

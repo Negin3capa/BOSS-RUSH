@@ -69,6 +69,7 @@ export class BaseCharacter {
     }
 
     takeDamage(amount, attackAttribute = ATTRIBUTES.PHYSICAL) {
+        // If already dead, don't take more damage (overkill depth is set at moment of death)
         if (this.isDead) return { damage: 0, mult: 1 };
 
         let multiplier = 1.0;
@@ -85,7 +86,6 @@ export class BaseCharacter {
 
         this.hp -= actualDamage;
         if (this.hp <= 0) {
-            this.hp = 0;
             this.isDead = true;
             this.statusEffects = []; // Clear on death
         }
@@ -94,8 +94,11 @@ export class BaseCharacter {
     }
 
     heal(amount) {
-        if (this.isDead) return;
+        // Heal can now target dead members
         this.hp = Math.min(this.maxHp, this.hp + amount);
+        if (this.isDead && this.hp > 0) {
+            this.isDead = false;
+        }
     }
 
     restoreSp(amount) {
