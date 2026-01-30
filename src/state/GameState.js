@@ -1,4 +1,5 @@
 import { BaseCharacter } from "../entities/BaseCharacter";
+import { getRandomSkills } from "../data/skills";
 import { GAMEPLAY } from "../constants";
 
 export class GameState {
@@ -10,16 +11,24 @@ export class GameState {
 
     initializeParty() {
         // Leader - Balanced
-        this.party.push(new BaseCharacter("Hero (Leader)", { hp: 100, sp: 50, attack: 15, defense: 10 }));
+        const hero = new BaseCharacter("Hero (Leader)", "Hero", { hp: 100, sp: 50, attack: 15, defense: 10 });
+        hero.skills = getRandomSkills("Hero", 4);
+        this.party.push(hero);
 
         // Member 2 - Tanky
-        this.party.push(new BaseCharacter("Tank", { hp: 150, sp: 30, attack: 12, defense: 15 }));
+        const tank = new BaseCharacter("Tank", "Tank", { hp: 150, sp: 30, attack: 12, defense: 15 });
+        tank.skills = getRandomSkills("Tank", 4);
+        this.party.push(tank);
 
         // Member 3 - Mage-like (High SP/Attack, Low Def)
-        this.party.push(new BaseCharacter("Mage", { hp: 70, sp: 100, attack: 20, defense: 5 }));
+        const mage = new BaseCharacter("Mage", "Mage", { hp: 70, sp: 100, attack: 20, defense: 5 });
+        mage.skills = getRandomSkills("Mage", 4);
+        this.party.push(mage);
 
         // Member 4 - Striker (High Attack, Low HP)
-        this.party.push(new BaseCharacter("Rogue", { hp: 80, sp: 40, attack: 25, defense: 8 }));
+        const rogue = new BaseCharacter("Rogue", "Rogue", { hp: 80, sp: 40, attack: 25, defense: 8 });
+        rogue.skills = getRandomSkills("Rogue", 4);
+        this.party.push(rogue);
     }
 
     generateEnemies() {
@@ -30,11 +39,13 @@ export class GameState {
             // Randomize enemy stats for variety
             const enemyStats = {
                 hp: 60,
-                sp: 0,
+                sp: 50,
                 attack: 20,
                 defense: 5
             };
-            this.enemies.push(new BaseCharacter(`Enemy ${i + 1}`, enemyStats));
+            const enemy = new BaseCharacter(`Enemy ${i + 1}`, "Enemy", enemyStats);
+            enemy.skills = getRandomSkills("ANY", 4);
+            this.enemies.push(enemy);
         }
         return this.enemies;
     }

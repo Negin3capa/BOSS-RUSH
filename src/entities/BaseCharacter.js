@@ -1,8 +1,10 @@
 import { GAMEPLAY } from "../constants";
 
 export class BaseCharacter {
-    constructor(name, baseStats) {
+    constructor(name, className, baseStats) {
         this.name = name;
+        this.className = className;
+        this.skills = []; // Assigned later via GameState
 
         // Randomize stats within a range (e.g., +/- 20% variance) to keep them relative but unique
         this.maxHp = this.randomizeStat(baseStats.hp);

@@ -1,5 +1,5 @@
 import k from "../kaplayCtx";
-import { COLORS, LAYOUT, SCREEN_WIDTH } from "../constants";
+import { COLORS, LAYOUT, SCREEN_WIDTH, SCREEN_HEIGHT } from "../constants";
 
 export function createBattleUI(gameState) {
     const uiContainer = k.add([
@@ -155,4 +155,88 @@ export function createTurnCounter() {
             }
         }
     ]);
+}
+
+export function createMenuSystem() {
+    // Container for Menus
+    const menuContainer = k.add([
+        k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60),
+        k.anchor("center"),
+        k.z(200),
+        k.fixed(),
+    ]);
+
+    const infoBox = k.add([
+        k.rect(600, 100),
+        k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 170),
+        k.anchor("center"),
+        k.color(0, 0, 0),
+        k.opacity(0.8),
+        k.outline(2, COLORS.uiBorder),
+        k.z(199),
+        k.fixed(),
+    ]);
+    infoBox.hidden = true;
+
+    const infoText = infoBox.add([
+        k.text("", { size: 18, width: 580 }),
+        k.anchor("center"),
+        k.color(COLORS.text),
+    ]);
+
+    const mainMenuText = menuContainer.add([
+        k.text("", { size: 30 }),
+        k.anchor("center"),
+        k.color(COLORS.text),
+    ]);
+
+    return {
+        updateMainMenu(selectedIndex) {
+            infoBox.hidden = true;
+            const formatBtn = (i, label) => (i === selectedIndex ? `> ${label} <` : `  ${label}  `);
+            const row1 = `${formatBtn(0, "FIGHT")}    ${formatBtn(1, "SKILL")}`;
+            const row2 = `${formatBtn(2, "DEFEND")}    ${formatBtn(3, "ITEM")}`;
+            mainMenuText.text = `${row1}\n\n${row2}`;
+        },
+        updateSkillMenu(skills, selectedIndex) {
+            infoBox.hidden = false;
+            // Skills: 4 items (0-3)
+            // 0 1
+            // 2 3
+            if (!skills || skills.length === 0) {
+                mainMenuText.text = "No Skills";
+                return;
+            }
+
+            const rows = [];
+            for (let i = 0; i < 4; i += 2) {
+                const s1 = skills[i];
+                const s2 = skills[i + 1];
+
+                const formatSkill = (skill, idx) => {
+                    if (!skill) return "   ---   ";
+                    const cursor = (idx === selectedIndex) ? ">" : " ";
+                    return `${cursor} ${skill.name} ${cursor}`;
+                };
+
+                rows.push(`${formatSkill(s1, i)}    ${formatSkill(s2, i + 1)}`);
+            }
+            mainMenuText.text = rows.join("\n\n");
+
+            // Update Info Box
+            const selectedSkill = skills[selectedIndex];
+            if (selectedSkill) {
+                infoText.text = `${selectedSkill.name} (${selectedSkill.spCost} SP) [${selectedSkill.attribute}]\n${selectedSkill.description}`;
+            } else {
+                infoText.text = "";
+            }
+        },
+        hide() {
+            mainMenuText.text = "";
+            infoBox.hidden = true;
+        },
+        showLog(msg) {
+            // Re-using common log not part of this container but handled in BattleScene
+        }
+    };
 }
