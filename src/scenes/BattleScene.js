@@ -12,28 +12,43 @@ export default function BattleScene() {
     let currentHeroIndex = 0;
     let turnCount = 1;
     let playerActions = [];
-    let selectedAction = null; // Store currently selected action
-    let selectedSkillIndex = 0; // For Skill Menu
-    let selectedEnemyIndex = 0; // For targeting cursor
-    let endOptionIndex = 0; // 0: Retry, 1: Give Up
+    let selectedAction = null;
+    let selectedSkillIndex = 0;
+    let selectedEnemyIndex = 0;
+    let endOptionIndex = 0;
+    let selectedActionIndex = 0;
+
+    // Background Nebula
+    const bg = k.add([
+        k.sprite("nebula"),
+        k.scale(Math.max(SCREEN_WIDTH / 1024, SCREEN_HEIGHT / 768) * 1.1),
+        k.pos(0, 0),
+        k.opacity(0.8),
+        k.z(-1),
+        {
+            update() {
+                this.pos.x = Math.sin(k.time() * 0.1) * 20;
+                this.pos.y = Math.cos(k.time() * 0.1) * 20;
+            }
+        }
+    ]);
 
     // UI Elements
-    createBattleUI(gameState);
+    const battleUI = createBattleUI(gameState);
     const log = createMessageLog();
     const turnCounter = createTurnCounter();
     const menuSystem = createMenuSystem();
 
-    // Visuals for Enemies (Centered)
+    // Visuals for Enemies
     const enemySprites = gameState.enemies.map((enemy, i) => {
-        // Center them, slightly offset if multiple
-        const xOffset = (i - (gameState.enemies.length - 1) / 2) * 150;
+        const xOffset = (i - (gameState.enemies.length - 1) / 2) * 180;
 
         const sprite = k.add([
-            k.rect(100, 100),
+            k.rect(120, 120),
             k.pos(LAYOUT.ENEMY_CENTER_X + xOffset, LAYOUT.ENEMY_CENTER_Y),
-            k.color(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy),
+            k.color(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy)),
             k.anchor("center"),
-            k.outline(UI.OUTLINE, COLORS.uiBorder), // Sketchy outline
+            k.outline(UI.OUTLINE, COLORS.uiBorder),
             k.scale(1),
             k.rotate(0),
             "enemy",
@@ -42,43 +57,35 @@ export default function BattleScene() {
                 id: i,
                 update() {
                     if (!this.char.isDead) {
-                        this.angle = Math.sin(k.time() * 1.5 + i) * 1.5; // Reduced wobble
-                        this.scale = k.vec2(1 + Math.sin(k.time() * 2 + i) * 0.015); // Breathing effect
+                        this.angle = Math.sin(k.time() * 1.0 + i) * 1.2;
+                        this.scale = k.vec2(1 + Math.sin(k.time() * 2.5 + i) * 0.015);
                     } else {
                         this.angle = 0;
                         this.scale = k.vec2(1);
+                        this.opacity = 0.4;
                     }
                 }
             }
         ]);
 
-        // Enemy HP Bar (Attached to Sprite)
-        // Shadow/Bg
+        // Enemy HP Bar frame
         sprite.add([
-            k.rect(80, 10),
-            k.pos(UI.SHADOW, -60 + UI.SHADOW),
-            k.anchor("center"),
-            k.color(COLORS.shadow),
-        ]);
-
-        // Frame
-        sprite.add([
-            k.rect(80, 10),
-            k.pos(0, -60),
+            k.rect(94, 14),
+            k.pos(0, -75),
             k.anchor("center"),
             k.color(COLORS.uiBackground),
             k.outline(2, COLORS.uiBorder),
         ]);
 
-        // Fill
+        // Enemy HP Bar fill
         sprite.add([
-            k.rect(80, 10),
-            k.pos(-40, -60), // Relative to sprite center
+            k.rect(90, 10),
+            k.pos(-45, -75),
             k.color(COLORS.hp),
             {
                 update() {
                     const ratio = enemy.hp / enemy.maxHp;
-                    this.width = k.lerp(this.width, ratio * 80, k.dt() * 10);
+                    this.width = k.lerp(this.width, Math.max(0, ratio * 90), k.dt() * 10);
                 }
             }
         ]);
@@ -86,630 +93,302 @@ export default function BattleScene() {
         return sprite;
     });
 
-    // Selection Cursor (Points to the active UI corner OR active enemy)
-    const cursor = k.add([
-        k.rect(20, 20),
-        k.pos(0, 0),
-        k.color(COLORS.highlight),
-        k.rotate(45), // Diamond shape
-        k.anchor("center"),
-        k.z(200),
-    ]);
-
-    // Target Cursor (To show who we are selecting)
+    // Selection Cursors
     const targetCursor = k.add([
-        k.polygon([k.vec2(0, 0), k.vec2(20, -30), k.vec2(-20, -30)]), // Down arrow
+        k.text("▼", { size: 40 }),
         k.pos(0, 0),
         k.color(COLORS.highlight),
+        k.anchor("center"),
         k.z(200),
         {
             update() {
-                // Bobbing animation
-                this.role = (k.time() * 10);
-                this.pos.y += Math.sin(k.time() * 10) * 0.5;
+                this.pos.y += Math.sin(k.time() * 10) * 0.8;
             }
         }
     ]);
     targetCursor.hidden = true;
 
-    function updateCursor() {
+    function updateSelectionVisuals() {
         if (turnPhase === "PLAYER_INPUT" || turnPhase === "SELECT_SKILL") {
-            cursor.hidden = false;
+            battleUI.updateSelection(currentHeroIndex);
             targetCursor.hidden = true;
-            if (currentHeroIndex < gameState.party.length) {
-                const pos = LAYOUT.POSITIONS[currentHeroIndex];
-                if (pos) {
-                    cursor.pos = k.vec2(pos.x + 100, pos.y - 30);
-                    if (currentHeroIndex >= 2) {
-                        cursor.pos = k.vec2(pos.x + 100, pos.y - 30);
-                    }
-                }
-            }
         } else if (turnPhase === "SELECT_TARGET") {
-            cursor.hidden = true;
+            battleUI.updateSelection(-1);
             targetCursor.hidden = false;
-
             if (selectedAction.targetMode === "ALLIES") {
                 const pos = LAYOUT.POSITIONS[selectedEnemyIndex];
-                if (pos) {
-                    targetCursor.pos = k.vec2(pos.x + 100, pos.y - 30);
-                }
+                targetCursor.pos = k.vec2(pos.x + 100, pos.y - 40);
             } else {
                 const enemySprite = enemySprites[selectedEnemyIndex];
-                if (enemySprite) {
-                    targetCursor.pos = k.vec2(enemySprite.pos.x, enemySprite.pos.y - 80);
-                }
+                targetCursor.pos = k.vec2(enemySprite.pos.x, enemySprite.pos.y - 100);
             }
+        } else {
+            battleUI.updateSelection(-1);
+            targetCursor.hidden = true;
         }
     }
-    updateCursor();
-
-    // Input Variables
-    const actions = ["FIGHT", "SKILL", "DEFEND", "ITEM"];
-    let selectedActionIndex = 0;
 
     // Input Handling
+    const actions = ["FIGHT", "SKILL", "DEFEND", "ITEM"];
+
     k.onKeyPress("left", () => {
         if (turnPhase === "PLAYER_INPUT") {
-            if (selectedActionIndex % 2 === 1) selectedActionIndex -= 1;
-            else selectedActionIndex += 1;
-            updateMenuVisuals();
+            selectedActionIndex = selectedActionIndex % 2 === 1 ? selectedActionIndex - 1 : selectedActionIndex + 1;
         } else if (turnPhase === "SELECT_SKILL") {
-            if (selectedSkillIndex % 2 === 1) selectedSkillIndex -= 1;
-            else selectedSkillIndex += 1;
-            updateMenuVisuals();
+            selectedSkillIndex = selectedSkillIndex % 2 === 1 ? selectedSkillIndex - 1 : selectedSkillIndex + 1;
         } else if (turnPhase === "SELECT_TARGET") {
             cycleTarget(-1);
+        } else if (turnPhase === "END") {
+            endOptionIndex = 0;
         }
+        updateMenuVisuals();
     });
 
     k.onKeyPress("right", () => {
         if (turnPhase === "PLAYER_INPUT") {
-            if (selectedActionIndex % 2 === 0) selectedActionIndex += 1;
-            else selectedActionIndex -= 1;
-            updateMenuVisuals();
+            selectedActionIndex = selectedActionIndex % 2 === 0 ? selectedActionIndex + 1 : selectedActionIndex - 1;
         } else if (turnPhase === "SELECT_SKILL") {
-            if (selectedSkillIndex % 2 === 0) selectedSkillIndex += 1;
-            else selectedSkillIndex -= 1;
-            updateMenuVisuals();
+            selectedSkillIndex = selectedSkillIndex % 2 === 0 ? selectedSkillIndex + 1 : selectedSkillIndex - 1;
         } else if (turnPhase === "SELECT_TARGET") {
             cycleTarget(1);
+        } else if (turnPhase === "END") {
+            endOptionIndex = 1;
         }
+        updateMenuVisuals();
     });
 
     k.onKeyPress("up", () => {
         if (turnPhase === "PLAYER_INPUT") {
-            if (selectedActionIndex >= 2) selectedActionIndex -= 2;
-            else selectedActionIndex += 2;
-            updateMenuVisuals();
+            selectedActionIndex = selectedActionIndex >= 2 ? selectedActionIndex - 2 : selectedActionIndex + 2;
         } else if (turnPhase === "SELECT_SKILL") {
-            if (selectedSkillIndex >= 2) selectedSkillIndex -= 2;
-            else selectedSkillIndex += 2;
-            updateMenuVisuals();
+            selectedSkillIndex = selectedSkillIndex >= 2 ? selectedSkillIndex - 2 : selectedSkillIndex + 2;
         }
+        updateMenuVisuals();
     });
 
     k.onKeyPress("down", () => {
         if (turnPhase === "PLAYER_INPUT") {
-            if (selectedActionIndex < 2) selectedActionIndex += 2;
-            else selectedActionIndex -= 2;
-            updateMenuVisuals();
+            selectedActionIndex = selectedActionIndex < 2 ? selectedActionIndex + 2 : selectedActionIndex - 2;
         } else if (turnPhase === "SELECT_SKILL") {
-            if (selectedSkillIndex < 2) selectedSkillIndex += 2;
-            else selectedSkillIndex -= 2;
-            updateMenuVisuals();
+            selectedSkillIndex = selectedSkillIndex < 2 ? selectedSkillIndex + 2 : selectedSkillIndex - 2;
         }
+        updateMenuVisuals();
     });
 
-    function cycleTarget(direction) {
-        let tries = 0;
-        do {
-            selectedEnemyIndex = (selectedEnemyIndex + direction + enemySprites.length) % enemySprites.length;
-            tries++;
-        } while (enemySprites[selectedEnemyIndex].char.isDead && tries < enemySprites.length);
-        updateCursor();
+    function cycleTarget(dir) {
+        if (selectedAction.targetMode === "ALLIES") {
+            let tries = 0;
+            do {
+                selectedEnemyIndex = (selectedEnemyIndex + dir + gameState.party.length) % gameState.party.length;
+                tries++;
+            } while (gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
+        } else {
+            let tries = 0;
+            do {
+                selectedEnemyIndex = (selectedEnemyIndex + dir + enemySprites.length) % enemySprites.length;
+                tries++;
+            } while (enemySprites[selectedEnemyIndex].char.isDead && tries < enemySprites.length);
+        }
+        updateSelectionVisuals();
     }
 
     k.onKeyPress("space", () => {
         if (turnPhase === "PLAYER_INPUT") {
             handleActionSelection(actions[selectedActionIndex]);
         } else if (turnPhase === "SELECT_SKILL") {
-            // Confirm Skill Selection
             handleSkillSelection();
         } else if (turnPhase === "SELECT_TARGET") {
             confirmTarget();
         } else if (turnPhase === "END") {
-            if (endOptionIndex === 0) {
-                gameRestart();
-            } else {
-                k.go("main");
-            }
+            if (endOptionIndex === 0) gameRestart();
+            else k.go("main");
         }
     });
-
-    k.onKeyPress("left", () => {
-        if (turnPhase === "END") {
-            endOptionIndex = 0;
-            updateEndVisuals();
-        }
-    });
-
-    k.onKeyPress("right", () => {
-        if (turnPhase === "END") {
-            endOptionIndex = 1;
-            updateEndVisuals();
-        }
-    });
-
-    let endButtons = [];
-    function updateEndVisuals() {
-        if (turnPhase !== "END") return;
-        endButtons.forEach((btn, i) => {
-            const label = i === 0 ? "Retry" : "Give Up";
-            btn.text = i === endOptionIndex ? `> ${label} <` : label;
-            btn.color = i === endOptionIndex ? COLORS.highlight : COLORS.text;
-        });
-    }
 
     k.onKeyPress("backspace", () => {
-        if (turnPhase === "SELECT_SKILL") {
-            turnPhase = "PLAYER_INPUT";
-            updateMenuVisuals();
-        } else if (turnPhase === "SELECT_TARGET") {
-            // If we came from SKILL, go back to SKILL, else go back to PLAYER_INPUT
-            if (selectedAction && selectedAction.type === "SKILL") { // Note: selectedAction structure might need adjustment
-                turnPhase = "SELECT_SKILL";
-                if (selectedAction.target === "ALL_ENEMIES" || selectedAction.target === "ALL_ALLIES") {
-                    // For ALL targets, we skip targeting phase usually, but if we are here it might be different.
-                    // Actually for ALL target skills we usually commit immediately in handleSkillSelection.
-                    // So likely we only cancel single target selection here.
-                }
-                updateCursor(); // Hide target cursor
-                updateMenuVisuals();
-                log.updateLog("Select Skill...");
-            } else {
-                turnPhase = "PLAYER_INPUT";
-                updateCursor();
-                updateMenuVisuals();
-                log.updateLog("Select Action");
-            }
+        if (turnPhase === "SELECT_SKILL") turnPhase = "PLAYER_INPUT";
+        else if (turnPhase === "SELECT_TARGET") {
+            turnPhase = selectedAction.type === "SKILL" ? "SELECT_SKILL" : "PLAYER_INPUT";
         }
+        updateMenuVisuals();
     });
 
     function updateMenuVisuals() {
         if (turnPhase === "PLAYER_INPUT") {
+            const hero = gameState.party[currentHeroIndex];
+            log.updateLog(`What will ${hero.name} do?`);
+            menuSystem.show();
             menuSystem.updateMainMenu(selectedActionIndex);
         } else if (turnPhase === "SELECT_SKILL") {
-            const hero = gameState.party[currentHeroIndex];
-            menuSystem.updateSkillMenu(hero.skills, selectedSkillIndex);
+            menuSystem.show();
+            menuSystem.updateSkillMenu(gameState.party[currentHeroIndex].skills, selectedSkillIndex);
         } else {
             menuSystem.hide();
         }
+        updateSelectionVisuals();
     }
+
+    // Call immediately to show Turn 1
     updateMenuVisuals();
 
     function handleActionSelection(type) {
         const hero = gameState.party[currentHeroIndex];
-        if (hero.isDead) {
-            nextHero(); // Should be skipped already but safeguard
-            return;
-        }
-
-        if (type === "FIGHT") {
-            startTargeting(type, "ENEMIES");
-        } else if (type === "SKILL") {
+        if (type === "FIGHT") startTargeting(type, "ENEMIES");
+        else if (type === "SKILL") {
             turnPhase = "SELECT_SKILL";
             selectedSkillIndex = 0;
             updateMenuVisuals();
-            log.updateLog("Select Skill...");
-        } else {
-            // Defend / Item -> Self
-            commitAction({ type, source: hero, target: hero });
-        }
+        } else commitAction({ type, source: hero, target: hero });
     }
 
     function handleSkillSelection() {
         const hero = gameState.party[currentHeroIndex];
         const skill = hero.skills[selectedSkillIndex];
+        if (!skill || hero.sp < skill.spCost) return;
 
-        if (!skill) return;
-
-        if (hero.sp < skill.spCost) {
-            log.updateLog("Not enough SP!");
-            return;
-        }
-
-        selectedAction = { type: "SKILL", skill, source: hero }; // Store skill in selectedAction
-
-        // Determine Targets
-        if (skill.target === "ONE_ENEMY") {
-            startTargeting("SKILL", "ENEMIES");
-        } else if (skill.target === "ONE_ALLY") {
-            startTargeting("SKILL", "ALLIES");
-        } else if (skill.target === "ALL_ENEMIES") {
-            // Auto-commit
-            commitAction({ ...selectedAction, target: "ALL_ENEMIES" });
-        } else if (skill.target === "ALL_ALLIES") {
-            // Auto-commit
-            commitAction({ ...selectedAction, target: "ALL_ALLIES" });
-        } else if (skill.target === "SELF") {
-            commitAction({ ...selectedAction, target: hero });
-        }
+        selectedAction = { type: "SKILL", skill, source: hero };
+        if (skill.target === "ONE_ENEMY") startTargeting("SKILL", "ENEMIES");
+        else if (skill.target === "ONE_ALLY") startTargeting("SKILL", "ALLIES");
+        else if (skill.target === "ALL_ENEMIES") commitAction({ ...selectedAction, target: "ALL_ENEMIES" });
+        else if (skill.target === "ALL_ALLIES") commitAction({ ...selectedAction, target: "ALL_ALLIES" });
+        else commitAction({ ...selectedAction, target: hero });
     }
 
     function startTargeting(type, mode) {
-        if (mode === "ENEMIES") {
-            selectedEnemyIndex = enemySprites.findIndex(s => !s.char.isDead);
-            if (selectedEnemyIndex === -1) return;
-        } else if (mode === "ALLIES") {
-            // Reset to 0 or current hero index? Let's reset to 0
-            selectedEnemyIndex = 0;
-        }
-
-        // If this is a new simple action (FIGHT), create a fresh object
-        // If it's SKILL, selectedAction is already set in handleSkillSelection
-        if (type !== "SKILL") {
-            selectedAction = { type };
-        }
-
-        selectedAction.targetMode = mode; // Store mode
-
+        if (type !== "SKILL") selectedAction = { type };
+        selectedAction.targetMode = mode;
+        selectedEnemyIndex = mode === "ENEMIES" ? enemySprites.findIndex(s => !s.char.isDead) : 0;
         turnPhase = "SELECT_TARGET";
-        log.updateLog(mode === "ALLIES" ? "Select Ally..." : "Select Enemy...");
-        updateCursor();
         updateMenuVisuals();
     }
 
-    function cycleTarget(direction) {
-        if (selectedAction.targetMode === "ALLIES") {
-            // Cycle through party
-            let tries = 0;
-            do {
-                selectedEnemyIndex = (selectedEnemyIndex + direction + gameState.party.length) % gameState.party.length;
-                tries++;
-            } while (gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
-        } else {
-            // Enemies
-            let tries = 0;
-            do {
-                selectedEnemyIndex = (selectedEnemyIndex + direction + enemySprites.length) % enemySprites.length;
-                tries++;
-            } while (enemySprites[selectedEnemyIndex].char.isDead && tries < enemySprites.length);
-        }
-        updateCursor();
-    }
-
-    // Need to handle cursor for Allies
-    // ... updateCursor logic needs changes ...
-
-
-
     function confirmTarget() {
-        const hero = gameState.party[currentHeroIndex];
-        let target;
-
-        if (selectedAction.targetMode === "ALLIES") {
-            target = gameState.party[selectedEnemyIndex];
-        } else {
-            target = enemySprites[selectedEnemyIndex].char;
-        }
-
-        commitAction({ ...selectedAction, source: hero, target });
+        const target = selectedAction.targetMode === "ALLIES" ? gameState.party[selectedEnemyIndex] : enemySprites[selectedEnemyIndex].char;
+        commitAction({ ...selectedAction, source: gameState.party[currentHeroIndex], target });
     }
 
     function commitAction(actionObj) {
         playerActions.push(actionObj);
-        turnPhase = "PLAYER_INPUT"; // Reset for next
         nextHero();
     }
 
     function nextHero() {
-        selectedAction = null; // Clear previous action
         currentHeroIndex++;
-        // Skip dead
-        while (currentHeroIndex < gameState.party.length && gameState.party[currentHeroIndex].isDead) {
-            currentHeroIndex++;
-        }
+        selectedActionIndex = 0;
+        selectedSkillIndex = 0;
+        selectedAction = null;
+
+        while (currentHeroIndex < gameState.party.length && gameState.party[currentHeroIndex].isDead) currentHeroIndex++;
 
         if (currentHeroIndex >= gameState.party.length) {
             turnPhase = "EXECUTING";
-            menuSystem.hide();
-            cursor.hidden = true;
-            targetCursor.hidden = true;
-            log.updateLog("Processing Turn...");
             executeTurn();
         } else {
-            updateCursor();
+            turnPhase = "PLAYER_INPUT";
             updateMenuVisuals();
         }
     }
 
     async function executeTurn() {
-        try {
-            // Player Actions
-            for (const action of playerActions) {
-                if (gameState.areEnemiesDefeated()) break;
-                if (action.source.isDead) continue;
-
-                await performAction(action);
-                await k.wait(0.8);
-            }
-
-            if (gameState.areEnemiesDefeated()) {
-                endGame(true);
-                return;
-            }
-
-            // Enemy Turn
-            log.updateLog("Enemy Phase!");
-            await k.wait(1.0);
-
-            for (const enemy of gameState.enemies) {
-                if (enemy.isDead) continue;
-                if (gameState.isPartyDefeated()) break;
-
-                const aliveHeroes = gameState.party.filter(h => !h.isDead);
-                if (aliveHeroes.length === 0) break;
-
-                const roll = Math.random();
-                if (roll < 0.2) {
-                    await performAction({ type: "DEFEND", source: enemy, target: enemy }); // Defend
-                } else if (roll < 0.6 && enemy.sp >= 10 && enemy.skills.length > 0) {
-                    // Use Random Skill
-                    const skill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
-                    let skillTarget;
-
-                    // Smart-ish target selection based on Skill Target Type
-                    if (skill.target === "ONE_ALLY" || skill.target === "ALL_ALLIES") {
-                        // Friendly Target (Another Enemy)
-                        const aliveEnemies = gameState.enemies.filter(e => !e.isDead);
-                        skillTarget = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
-                    } else if (skill.target === "SELF") {
-                        skillTarget = enemy;
-                    } else {
-                        // Hostile Target (Player)
-                        skillTarget = aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)];
-                    }
-
-                    // For ALL_X targets, we pass the flag string, performAction handles context
-                    if (skill.target === "ALL_ENEMIES" || skill.target === "ALL_ALLIES") {
-                        skillTarget = skill.target;
-                    }
-
-                    await performAction({ type: "SKILL", source: enemy, target: skillTarget, skill });
-                } else {
-                    const target = aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)];
-                    await performAction({ type: "FIGHT", source: enemy, target });
-                }
-                await k.wait(0.8);
-            }
-
-            if (gameState.isPartyDefeated()) {
-                endGame(false);
-            } else {
-                startNewRound();
-            }
-        } catch (e) {
-            console.error(e);
-            log.updateLog("Error: " + e.message);
+        menuSystem.hide();
+        for (const action of playerActions) {
+            if (gameState.areEnemiesDefeated() || action.source.isDead) continue;
+            await performAction(action);
+            await k.wait(0.6);
         }
+        if (gameState.areEnemiesDefeated()) return endGame(true);
+
+        for (const enemy of gameState.enemies) {
+            if (enemy.isDead || gameState.isPartyDefeated()) continue;
+            await enemyTurn(enemy);
+            await k.wait(0.6);
+        }
+
+        if (gameState.isPartyDefeated()) endGame(false);
+        else startNewRound();
+    }
+
+    async function enemyTurn(enemy) {
+        const aliveHeroes = gameState.party.filter(h => !h.isDead);
+        const roll = Math.random();
+        if (roll < 0.2) await performAction({ type: "DEFEND", source: enemy, target: enemy });
+        else if (roll < 0.6 && enemy.sp >= 10) {
+            const skill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
+            const targetGroup = (skill.target === "ONE_ALLY" || skill.target === "ALL_ALLIES") ? gameState.enemies.filter(e => !e.isDead) : aliveHeroes;
+            const target = targetGroup[Math.floor(Math.random() * targetGroup.length)];
+            await performAction({ type: "SKILL", source: enemy, target, skill });
+        } else await performAction({ type: "FIGHT", source: enemy, target: aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)] });
     }
 
     async function performAction(action) {
-        try {
-            const { type, source, target, skill } = action;
+        const { type, source, target, skill } = action;
+        log.updateLog(`${source.name} uses ${type === "SKILL" ? skill.name : type}!`);
 
-            if (type === "DEFEND") {
-                source.defend();
-                log.updateLog(`${source.name} Defends!`);
-            } else if (type === "FIGHT") {
-                const { damage, mult } = target.takeDamage(source.attack, source.attribute);
-                log.updateLog(`${source.name} attacks ${target.name} for ${damage}!`);
-                if (mult > 1) log.updateLog("It's super effective!");
-                if (mult < 1) log.updateLog("It's not very effective...");
-                shakeScreen();
-            } else if (type === "SKILL") {
-                if (!skill) {
-                    throw new Error("Skill is undefined in performAction");
-                }
-                if (!source.costSp(skill.spCost)) {
-                    log.updateLog(`${source.name} failed (No SP)!`);
-                    return;
-                }
+        if (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage")) {
+            const targets = (target === "ALL_ENEMIES") ? gameState.enemies.filter(e => !e.isDead) :
+                (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
 
-                log.updateLog(`${source.name} uses ${skill.name}!`);
-
-                // Resolve Targets Contextually
-                let targets = [];
-
-                // Determine groups based on source
-                const isPlayer = gameState.party.includes(source);
-                const friends = isPlayer ? gameState.party : gameState.enemies;
-                const foes = isPlayer ? gameState.enemies : gameState.party;
-
-                if (target === "ALL_ENEMIES") {
-                    targets = foes.filter(u => !u.isDead);
-                } else if (target === "ALL_ALLIES") {
-                    targets = friends.filter(u => !u.isDead);
-                } else {
-                    // Single target object
-                    if (target) targets = [target];
-                }
-
-                for (const t of targets) {
-                    if (!t) continue;
-                    // Effects
-                    if (skill.type === "Damage") {
-                        // Formula: (Atk + Power) * Variance - Def/2
-                        let baseDmg = Math.floor((source.attack + skill.power) * (0.9 + Math.random() * 0.2));
-                        const { damage, mult } = t.takeDamage(baseDmg, skill.attribute);
-
-                        if (mult > 1) log.updateLog("It's super effective!");
-                        if (mult < 1) log.updateLog("It's not very effective...");
-
-                        playAnimation(t, "DAMAGE");
-                    } else if (skill.type === "Heal") {
-                        t.heal(skill.power);
-                        playAnimation(t, "HEAL");
-                    } else if (skill.type === "Buff") {
-                        playAnimation(t, "BUFF");
-                        if (skill.effect) {
-                            if (skill.effect.stat === "attack") t.attack = Math.floor(t.attack * skill.effect.amount);
-                            if (skill.effect.stat === "defense") t.defense = Math.floor(t.defense * skill.effect.amount);
-                        }
-                    } else if (skill.type === "Debuff") {
-                        playAnimation(t, "DEBUFF");
-                        if (skill.effect) {
-                            if (skill.effect.stat === "attack") t.attack = Math.floor(t.attack * skill.effect.amount);
-                            if (skill.effect.stat === "defense") t.defense = Math.floor(t.defense * skill.effect.amount);
-                        }
-                    }
-                }
-
-                if (skill.type === "Damage") shakeScreen(5);
-                await k.wait(0.5);
-
-            } else if (type === "ITEM") {
-                const healAmount = Math.floor(GAMEPLAY.ITEM_HEAL_MIN + Math.random() * (GAMEPLAY.ITEM_HEAL_MAX - GAMEPLAY.ITEM_HEAL_MIN));
-                source.heal(healAmount);
-                log.updateLog(`${source.name} uses Item! +${healAmount} HP.`);
-                playAnimation(source, "HEAL");
-            }
-
-            // Update Enemy Sprites (Visual Dead State)
-            enemySprites.forEach(s => {
-                if (s.char.isDead) {
-                    s.color = k.rgb(50, 50, 50);
+            targets.forEach(t => {
+                if (!t) return;
+                const basePower = type === "FIGHT" ? source.attack : source.attack + skill.power;
+                t.takeDamage(basePower, type === "SKILL" ? skill.attribute : source.attribute);
+            });
+            shakeScreen(5);
+        } else if (type === "DEFEND") source.defend();
+        else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
+            const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
+            targets.forEach(t => t.heal(skill ? skill.power : 50));
+        } else if (type === "SKILL" && (skill.type === "Buff" || skill.type === "Debuff")) {
+            const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) :
+                (target === "ALL_ENEMIES") ? gameState.enemies.filter(e => !e.isDead) : [target];
+            targets.forEach(t => {
+                if (skill.effect) {
+                    if (skill.effect.stat === "attack") t.attack = Math.floor(t.attack * skill.effect.amount);
+                    if (skill.effect.stat === "defense") t.defense = Math.floor(t.defense * skill.effect.amount);
                 }
             });
-        } catch (e) {
-            console.error("Action Failed", e);
-            log.updateLog("Action Failed!");
-        }
-    }
-
-    function playAnimation(target, type) {
-        // Find screen position of target
-        let pos;
-        if (target.className === "Enemy") { // Assuming we added className to enemies too
-            // Find sprite
-            const sprite = enemySprites.find(s => s.char === target);
-            if (sprite) pos = sprite.pos;
-        } else {
-            // Hero
-            const index = gameState.party.indexOf(target);
-            if (index !== -1) {
-                const p = LAYOUT.POSITIONS[index];
-                pos = k.vec2(p.x + 100, p.y + 50); // Center of box roughly
-            }
         }
 
-        if (!pos) return;
+        if (type === "SKILL" && skill) source.costSp(skill.spCost);
 
-        let text = "";
-        let color = k.rgb(255, 255, 255);
-        let moveVec = k.vec2(0, -50); // Move Up
-
-        if (type === "HEAL") {
-            text = "+";
-            color = k.rgb(0, 255, 0);
-        } else if (type === "BUFF") {
-            text = "^";
-            color = k.rgb(50, 50, 255);
-        } else if (type === "DEBUFF") {
-            text = "v";
-            color = k.rgb(150, 50, 50);
-            moveVec = k.vec2(0, 50); // Move Down
-        } else if (type === "DAMAGE") {
-            // Damage usually shakes, maybe red flash?
-            // We can skip text for damage or show number?
-            // For now just skip as we shake screen.
-            return;
-        }
-
-        k.add([
-            k.text(text, { size: 40 }),
-            k.pos(pos),
-            k.color(color),
-            k.lifespan(0.5),
-            k.z(300),
-            {
-                update() {
-                    this.pos.x += moveVec.x * k.dt();
-                    this.pos.y += moveVec.y * k.dt();
-                }
-            }
-        ]);
+        enemySprites.forEach(s => s.opacity = s.char.isDead ? 0.3 : 1);
+        await k.wait(0.4);
     }
 
     function startNewRound() {
-        turnPhase = "PLAYER_INPUT";
-        playerActions = [];
-        currentHeroIndex = 0;
         turnCount++;
         turnCounter.updateCount(turnCount);
-
-        while (currentHeroIndex < gameState.party.length && gameState.party[currentHeroIndex].isDead) {
-            currentHeroIndex++;
-        }
-
         gameState.party.forEach(h => h.resetTurn());
         gameState.enemies.forEach(e => e.resetTurn());
-
-        cursor.hidden = false;
-        targetCursor.hidden = true;
-        updateCursor();
+        playerActions = [];
+        currentHeroIndex = 0;
+        selectedActionIndex = 0;
+        selectedSkillIndex = 0;
+        while (currentHeroIndex < gameState.party.length && gameState.party[currentHeroIndex].isDead) currentHeroIndex++;
+        turnPhase = "PLAYER_INPUT";
         updateMenuVisuals();
-        log.updateLog(`Turn ${turnCount} Start!`);
     }
 
     function endGame(win) {
         turnPhase = "END";
-        const msg = win ? "VICTORY!" : "GAME OVER";
-        log.updateLog(msg);
+        k.add([k.rect(SCREEN_WIDTH, SCREEN_HEIGHT), k.color(0, 0, 0), k.opacity(0.6), k.z(500)]);
+        const winBox = k.add([k.rect(600, 300), k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2), k.anchor("center"), k.color(COLORS.uiBackground), k.outline(UI.OUTLINE, COLORS.uiBorder), k.z(501)]);
+        winBox.add([k.text(win ? "VICTORY" : "GAMEOVER", { size: 60, font: "Viga" }), k.anchor("center"), k.pos(0, -50), k.color(COLORS.text)]);
 
-        // Backdrop
-        k.add([
-            k.rect(SCREEN_WIDTH, SCREEN_HEIGHT),
-            k.color(0, 0, 0),
-            k.opacity(0.8),
-            k.z(500),
-        ]);
+        const retry = winBox.add([k.rect(200, 60), k.pos(-120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
+        retry.add([k.text("RETRY", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
 
-        // Title
-        k.add([
-            k.text(msg, { size: 80, font: "Viga" }),
-            k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60),
-            k.anchor("center"),
-            k.color(win ? COLORS.highlight : COLORS.hp),
-            k.z(501),
-            k.scale(1),
-            {
-                update() {
-                    this.scale = k.vec2(1 + Math.sin(k.time() * 5) * 0.05);
-                }
-            }
-        ]);
+        const quit = winBox.add([k.rect(200, 60), k.pos(120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
+        quit.add([k.text("QUIT", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
 
-        const btnRetry = k.add([
-            k.text("Retry", { size: 32, font: "Viga" }),
-            k.pos(SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 80),
-            k.anchor("center"),
-            k.color(COLORS.highlight),
-            k.z(502),
-        ]);
+        const btns = [retry, quit];
 
-        const btnQuit = k.add([
-            k.text("Give Up", { size: 32, font: "Viga" }),
-            k.pos(SCREEN_WIDTH / 2 + 120, SCREEN_HEIGHT / 2 + 80),
-            k.anchor("center"),
-            k.color(COLORS.text),
-            k.z(502),
-        ]);
-
-        endButtons = [btnRetry, btnQuit];
-        endOptionIndex = 0;
-        updateEndVisuals();
+        // Simple loop for highlights
+        k.onUpdate(() => {
+            btns.forEach((b, i) => {
+                b.color = i === endOptionIndex ? k.rgb(COLORS.highlight[0], COLORS.highlight[1], COLORS.highlight[2]) : k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
+            });
+        });
     }
 
     function gameRestart() {
@@ -718,7 +397,5 @@ export default function BattleScene() {
         k.go("battle");
     }
 
-    function shakeScreen(amount = 2) {
-        k.shake(amount);
-    }
+    function shakeScreen(amount) { k.shake(amount); }
 }

@@ -14,24 +14,24 @@ export const ATTRIBUTES = {
 };
 
 export const COLORS = {
-    background: [10, 10, 15],      // Much darker
-    uiBackground: [25, 25, 30],    // Dark grey
-    text: [240, 240, 240],        // Off-white
-    highlight: [255, 215, 0],     // Gold
-    hp: [255, 70, 70],            // Brighter Red
-    sp: [70, 150, 255],           // Brighter Blue
-    enemy: [200, 100, 100],
-    player: [100, 200, 100],
-    uiBorder: [240, 240, 240],
-    shadow: [0, 0, 0],
+    background: [20, 10, 35],      // Deep Space Purple
+    uiBackground: [255, 255, 255],  // pure White
+    text: [20, 20, 25],             // Dark Ink
+    highlight: [240, 80, 120],      // OMORI Pink
+    hp: [240, 80, 120],            // Pink
+    sp: [80, 240, 210],            // Teal
+    enemy: [200, 80, 80],
+    player: [80, 180, 80],
+    uiBorder: [0, 0, 0],            // Black
+    shadow: [100, 100, 120],        // Muted grey shadow
 };
 
 export const UI = {
-    OUTLINE: 4,
-    SHADOW: 6,
-    PUNCH_SCALE: 1.2,
-    WOBBLE_SPEED: 8,
-    WOBBLE_FORCE: 0.1,
+    OUTLINE: 6,                     // Thicker for sketchy look
+    SHADOW: 8,
+    PUNCH_SCALE: 1.15,
+    WOBBLE_SPEED: 6,
+    WOBBLE_FORCE: 0.08,
 };
 
 

@@ -6,6 +6,9 @@ import MainScreen from "./scenes/MainScreen";
 k.loadFont("Viga", "https://fonts.gstatic.com/s/viga/v15/xMQbuFFdSaiX_QI.ttf");
 k.loadFont("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf");
 
+// Load Sprites
+k.loadSprite("nebula", "/nebula.png");
+
 k.scene("main", MainScreen);
 k.scene("battle", BattleScene);
 
