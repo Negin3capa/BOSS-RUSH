@@ -1,5 +1,6 @@
 import k from "../kaplayCtx";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, UI } from "../constants";
+import { gameState } from "../state/GameState";
 
 export default function MainScreen() {
     let selectedOption = 0;
@@ -98,6 +99,7 @@ export default function MainScreen() {
 
     k.onKeyPress("space", () => {
         if (options[selectedOption] === "START") {
+            gameState.initializeParty();
             k.go("battle");
         } else if (options[selectedOption] === "QUIT") {
             k.debug.log("Quit selected");
@@ -106,6 +108,7 @@ export default function MainScreen() {
 
     k.onKeyPress("enter", () => {
         if (options[selectedOption] === "START") {
+            gameState.initializeParty();
             k.go("battle");
         }
     });

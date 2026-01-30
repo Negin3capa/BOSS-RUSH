@@ -221,6 +221,34 @@ export function createTurnCounter() {
     return label;
 }
 
+export function createRoundCounter(gameState) {
+    const container = k.add([
+        k.pos(SCREEN_WIDTH - 155, 25),
+        k.fixed(),
+        k.z(100),
+    ]);
+
+    container.add([
+        k.rect(130, 45),
+        k.color(COLORS.uiBackground),
+        k.outline(UI.OUTLINE, COLORS.uiBorder),
+    ]);
+
+    const label = container.add([
+        k.text(`Round: ${gameState.roundCounter}`, { size: 22, font: "Viga" }),
+        k.pos(65, 22),
+        k.anchor("center"),
+        k.color(COLORS.text),
+        {
+            update() {
+                this.text = `Round: ${gameState.roundCounter}`;
+            }
+        }
+    ]);
+
+    return label;
+}
+
 export function createMenuSystem() {
     const menuContainer = k.add([
         k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60),

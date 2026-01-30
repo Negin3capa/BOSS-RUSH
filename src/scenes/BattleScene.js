@@ -1,7 +1,7 @@
 import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
-import { createBattleUI, createMessageLog, createTurnCounter, createMenuSystem } from "../ui/BattleUI";
+import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem } from "../ui/BattleUI";
 
 export default function BattleScene() {
     // Reset state on restart (enemies regen)
@@ -40,6 +40,7 @@ export default function BattleScene() {
     const battleUI = createBattleUI(gameState);
     const log = createMessageLog();
     const turnCounter = createTurnCounter();
+    const roundCounter = createRoundCounter(gameState);
     const menuSystem = createMenuSystem();
 
     // Visuals for Enemies
@@ -59,12 +60,13 @@ export default function BattleScene() {
                 char: enemy,
                 id: i,
                 update() {
+                    const baseScale = enemy.isBoss ? 2.5 : 1;
                     if (!this.char.isDead) {
                         this.angle = Math.sin(k.time() * 1.0 + i) * 1.2;
-                        this.scale = k.vec2(1 + Math.sin(k.time() * 2.5 + i) * 0.015);
+                        this.scale = k.vec2(baseScale + Math.sin(k.time() * 2.5 + i) * 0.015);
                     } else {
                         this.angle = 0;
-                        this.scale = k.vec2(1);
+                        this.scale = k.vec2(baseScale);
                         this.opacity = 0.4;
                     }
                 }
@@ -74,7 +76,7 @@ export default function BattleScene() {
         // Enemy HP Bar frame
         sprite.add([
             k.rect(94, 14),
-            k.pos(0, -75),
+            k.pos(0, enemy.isBoss ? -70 : -75),
             k.anchor("center"),
             k.color(COLORS.uiBackground),
             k.outline(2, COLORS.uiBorder),
@@ -83,7 +85,7 @@ export default function BattleScene() {
         // Enemy HP Bar fill
         sprite.add([
             k.rect(90, 10),
-            k.pos(-45, -75),
+            k.pos(-45, enemy.isBoss ? -70 : -75),
             k.color(COLORS.hp),
             {
                 update() {
@@ -122,7 +124,8 @@ export default function BattleScene() {
                 targetCursor.pos = k.vec2(pos.x + 100, pos.y - 40);
             } else {
                 const enemySprite = enemySprites[selectedEnemyIndex];
-                targetCursor.pos = k.vec2(enemySprite.pos.x, enemySprite.pos.y - 100);
+                const yOffset = enemySprite.char.isBoss ? 200 : 100;
+                targetCursor.pos = k.vec2(enemySprite.pos.x, enemySprite.pos.y - yOffset);
             }
         } else {
             battleUI.updateSelection(-1);
@@ -244,7 +247,13 @@ export default function BattleScene() {
         } else if (turnPhase === "SELECT_TARGET") {
             confirmTarget();
         } else if (turnPhase === "END") {
-            if (endOptionIndex === 0) gameRestart();
+            if (endOptionIndex === 0) {
+                if (gameState.isPartyDefeated()) {
+                    gameRestart(true); // New Game
+                } else {
+                    gameRestart(false); // Continue
+                }
+            }
             else k.go("main");
         }
     });
@@ -371,7 +380,24 @@ export default function BattleScene() {
     }
 
     async function performAction(action) {
-        const { type, source, target, skill } = action;
+        let { type, source, target, skill } = action;
+
+        // Target Redirection Logic: If single target is dead, redirect to another alive target in the same group
+        if (target && target.isDead && target !== "ALL_ENEMIES" && target !== "ALL_ALLIES") {
+            const isEnemyGroup = gameState.enemies.includes(target);
+            const group = isEnemyGroup ? gameState.enemies : gameState.party;
+            const aliveTargets = group.filter(e => !e.isDead);
+
+            if (aliveTargets.length > 0) {
+                target = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
+                log.updateLog(`${source.name} redirects attack to ${target.name}!`);
+                await k.wait(0.4);
+            } else {
+                // If no one is alive, the action is cancelled or handled by the execution loop continue checks
+                return;
+            }
+        }
+
         log.updateLog(`${source.name} uses ${type === "SKILL" ? skill.name : type}!`);
 
         const targetPos = getTargetPos(target);
@@ -381,7 +407,7 @@ export default function BattleScene() {
                 (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
 
             targets.forEach(t => {
-                if (!t) return;
+                if (!t || t.isDead) return;
                 const basePower = (type === "FIGHT" || !skill) ? source.attack : source.attack + skill.power;
                 t.takeDamage(basePower, (type === "SKILL" && skill) ? skill.attribute : source.attribute);
             });
@@ -393,7 +419,7 @@ export default function BattleScene() {
             const amount = skill ? skill.power : 50;
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
             targets.forEach(t => {
-                if (!t) return;
+                if (!t || t.isDead) return;
                 t.heal(amount);
                 spawnParticles(getTargetPos(t), "+", [100, 255, 100]);
             });
@@ -409,12 +435,14 @@ export default function BattleScene() {
             const charType = isBuff ? "↑" : "↓";
             let color = [255, 255, 255];
 
-            if (skill.effect.stat === "attack") color = [240, 80, 120];
-            if (skill.effect.stat === "defense") color = [255, 255, 150];
-            if (skill.effect.stat === "speed") color = [80, 240, 210];
+            if (skill.effect) {
+                if (skill.effect.stat === "attack") color = [240, 80, 120];
+                if (skill.effect.stat === "defense") color = [255, 255, 150];
+                if (skill.effect.stat === "speed") color = [80, 240, 210];
+            }
 
             targets.forEach(t => {
-                if (!t) return;
+                if (!t || t.isDead) return;
                 if (skill.effect) {
                     if (skill.effect.stat === "attack") t.attack = Math.floor(t.attack * skill.effect.amount);
                     if (skill.effect.stat === "defense") t.defense = Math.floor(t.defense * skill.effect.amount);
@@ -424,7 +452,8 @@ export default function BattleScene() {
 
             await k.wait(0.4);
             const change = isBuff ? "increased" : "decreased";
-            log.updateLog(`${source.name} used ${skill.name}. ${target.name || "Target"}'s ${skill.effect.stat} ${change}!`);
+            const statName = skill.effect ? skill.effect.stat : "stats";
+            log.updateLog(`${source.name} used ${skill.name}. ${target.name || "Target"}'s ${statName} ${change}!`);
         }
 
         if (type === "SKILL" && skill) source.costSp(skill.spCost);
@@ -450,12 +479,19 @@ export default function BattleScene() {
 
     function endGame(win) {
         turnPhase = "END";
+
+        // Increment scaling after a boss battle victory
+        if (win && gameState.roundCounter % 3 === 0) {
+            gameState.scalingFactor += 0.2;
+        }
+
         k.add([k.rect(SCREEN_WIDTH, SCREEN_HEIGHT), k.color(0, 0, 0), k.opacity(0.6), k.z(500)]);
         const winBox = k.add([k.rect(600, 300), k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2), k.anchor("center"), k.color(COLORS.uiBackground), k.outline(UI.OUTLINE, COLORS.uiBorder), k.z(501)]);
         winBox.add([k.text(win ? "VICTORY" : "GAMEOVER", { size: 60, font: "Viga" }), k.anchor("center"), k.pos(0, -50), k.color(COLORS.text)]);
 
+        const primaryBtnLabel = win ? "CONTINUE" : "RETRY";
         const retry = winBox.add([k.rect(200, 60), k.pos(-120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
-        retry.add([k.text("RETRY", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
+        retry.add([k.text(primaryBtnLabel, { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
 
         const quit = winBox.add([k.rect(200, 60), k.pos(120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
         quit.add([k.text("QUIT", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
@@ -469,9 +505,13 @@ export default function BattleScene() {
         });
     }
 
-    function gameRestart() {
-        gameState.party = [];
-        gameState.initializeParty();
+    function gameRestart(newGame = false) {
+        if (newGame) {
+            gameState.initializeParty();
+        } else {
+            gameState.roundCounter++;
+            gameState.party.forEach(h => h.resetTurn());
+        }
         k.go("battle");
     }
 
