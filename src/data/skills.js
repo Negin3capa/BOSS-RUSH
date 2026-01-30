@@ -1,16 +1,7 @@
 export const SKILL_DATA = [];
 
-const ATTRIBUTES = {
-    PHYSICAL: "Physical",
-    FIRE: "Fire",
-    WATER: "Water",
-    WIND: "Wind",
-    STONE: "Stone",
-    DARK: "Dark",
-    LIGHT: "Light",
-    HEALING: "Healing",
-    SPECIAL: "Special" // Buffs/Debuffs
-};
+import { ATTRIBUTES } from "../constants";
+
 
 const TARGETS = {
     ONE_ENEMY: "ONE_ENEMY",

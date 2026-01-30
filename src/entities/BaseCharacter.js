@@ -1,10 +1,13 @@
-import { GAMEPLAY } from "../constants";
+import { GAMEPLAY, ELEMENTAL_CHART, ATTRIBUTES } from "../constants";
 
 export class BaseCharacter {
     constructor(name, className, baseStats) {
         this.name = name;
         this.className = className;
         this.skills = []; // Assigned later via GameState
+
+        // Default attribute
+        this.attribute = ATTRIBUTES.PHYSICAL;
 
         // Randomize stats within a range (e.g., +/- 20% variance) to keep them relative but unique
         this.maxHp = this.randomizeStat(baseStats.hp);
@@ -26,10 +29,15 @@ export class BaseCharacter {
         return Math.floor(value * variance);
     }
 
-    takeDamage(amount) {
-        if (this.isDead) return 0;
+    takeDamage(amount, attackAttribute = ATTRIBUTES.PHYSICAL) {
+        if (this.isDead) return { damage: 0, mult: 1 };
 
-        let actualDamage = amount - (this.defense / 2); // Damage formula: Amount - (Defense / 2)
+        let multiplier = 1.0;
+        if (ELEMENTAL_CHART[attackAttribute] && ELEMENTAL_CHART[attackAttribute][this.attribute]) {
+            multiplier = ELEMENTAL_CHART[attackAttribute][this.attribute];
+        }
+
+        let actualDamage = (amount * multiplier) - (this.defense / 2); // Damage formula: (Amount * Mult) - (Defense / 2)
         if (this.isDefending) {
             actualDamage *= GAMEPLAY.DEFEND_DAMAGE_REDUCTION;
         }
@@ -42,7 +50,7 @@ export class BaseCharacter {
             this.isDead = true;
         }
 
-        return actualDamage;
+        return { damage: actualDamage, mult: multiplier };
     }
 
     heal(amount) {

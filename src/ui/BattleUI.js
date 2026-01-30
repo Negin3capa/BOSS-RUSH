@@ -34,14 +34,15 @@ export function createBattleUI(gameState) {
 
         // HP Bar
         const hpY = 40;
+        const barX = 10;
         container.add([
             k.rect(LAYOUT.BAR_WIDTH, LAYOUT.BAR_HEIGHT),
-            k.pos(10, hpY),
+            k.pos(barX, hpY),
             k.color(0, 0, 0),
         ]);
         container.add([
             k.rect(LAYOUT.BAR_WIDTH, LAYOUT.BAR_HEIGHT),
-            k.pos(10, hpY),
+            k.pos(barX, hpY),
             k.color(COLORS.hp),
             {
                 update() {
@@ -51,14 +52,14 @@ export function createBattleUI(gameState) {
         ]);
         container.add([
             k.text("HP", { size: 12 }),
-            k.pos(10, hpY + 2),
+            k.pos(barX + 5, hpY + 2),
             k.color(COLORS.text),
             k.z(101),
         ]);
         // HP Text
         container.add([
             k.text("", { size: 12 }),
-            k.pos(LAYOUT.BAR_WIDTH - 10, hpY + 2),
+            k.pos(barX + LAYOUT.BAR_WIDTH - 5, hpY + 2),
             k.anchor("right"),
             k.z(101),
             {
@@ -73,12 +74,12 @@ export function createBattleUI(gameState) {
         const spY = 65;
         container.add([
             k.rect(LAYOUT.BAR_WIDTH, LAYOUT.BAR_HEIGHT),
-            k.pos(10, spY),
+            k.pos(barX, spY),
             k.color(0, 0, 0),
         ]);
         container.add([
             k.rect(LAYOUT.BAR_WIDTH, LAYOUT.BAR_HEIGHT),
-            k.pos(10, spY),
+            k.pos(barX, spY),
             k.color(COLORS.sp),
             {
                 update() {
@@ -88,9 +89,21 @@ export function createBattleUI(gameState) {
         ]);
         container.add([
             k.text("SP", { size: 12 }),
-            k.pos(10, spY + 2),
+            k.pos(barX + 5, spY + 2),
             k.color(COLORS.text),
             k.z(101),
+        ]);
+        // SP Text
+        container.add([
+            k.text("", { size: 12 }),
+            k.pos(barX + LAYOUT.BAR_WIDTH - 5, spY + 2),
+            k.anchor("right"),
+            k.z(101),
+            {
+                update() {
+                    this.text = `${char.sp}/${char.maxSp}`;
+                }
+            }
         ]);
 
         // Status (Dead/Defend) Overlay

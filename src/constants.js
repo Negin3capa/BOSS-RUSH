@@ -1,6 +1,18 @@
 export const SCREEN_WIDTH = 1024;
 export const SCREEN_HEIGHT = 768;
 
+export const ATTRIBUTES = {
+    PHYSICAL: "Physical",
+    FIRE: "Fire",
+    WATER: "Water",
+    WIND: "Wind",
+    STONE: "Stone",
+    DARK: "Dark",
+    LIGHT: "Light",
+    HEALING: "Healing",
+    SPECIAL: "Special"
+};
+
 export const COLORS = {
     background: [20, 20, 30],
     uiBackground: [40, 40, 50],
@@ -11,6 +23,27 @@ export const COLORS = {
     enemy: [200, 100, 100],
     player: [100, 200, 100],
     uiBorder: [255, 255, 255],
+};
+
+export const ATTRIBUTE_COLORS = {
+    [ATTRIBUTES.PHYSICAL]: [255, 255, 255], // White
+    [ATTRIBUTES.FIRE]: [255, 50, 50],    // Red
+    [ATTRIBUTES.WATER]: [50, 100, 255],  // Blue
+    [ATTRIBUTES.WIND]: [50, 200, 100],   // Green
+    [ATTRIBUTES.STONE]: [150, 100, 50],  // Brown
+    [ATTRIBUTES.DARK]: [150, 50, 200],   // Purple
+    [ATTRIBUTES.LIGHT]: [255, 255, 100], // Yellow
+};
+
+// Rock-Paper-Scissors: Fire -> Stone -> Wind -> Water -> Fire
+// Duality: Light <-> Dark
+export const ELEMENTAL_CHART = {
+    [ATTRIBUTES.FIRE]: { [ATTRIBUTES.STONE]: 2.0, [ATTRIBUTES.WATER]: 0.5 },
+    [ATTRIBUTES.STONE]: { [ATTRIBUTES.WIND]: 2.0, [ATTRIBUTES.FIRE]: 0.5 },
+    [ATTRIBUTES.WIND]: { [ATTRIBUTES.WATER]: 2.0, [ATTRIBUTES.STONE]: 0.5 },
+    [ATTRIBUTES.WATER]: { [ATTRIBUTES.FIRE]: 2.0, [ATTRIBUTES.WIND]: 0.5 },
+    [ATTRIBUTES.LIGHT]: { [ATTRIBUTES.DARK]: 2.0, [ATTRIBUTES.LIGHT]: 0.5 },
+    [ATTRIBUTES.DARK]: { [ATTRIBUTES.LIGHT]: 2.0, [ATTRIBUTES.DARK]: 0.5 },
 };
 
 // Gameplay Constants

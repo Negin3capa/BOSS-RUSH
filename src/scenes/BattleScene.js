@@ -1,6 +1,6 @@
 import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
-import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT } from "../constants";
+import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES } from "../constants";
 import { createBattleUI, createMessageLog, createTurnCounter, createMenuSystem } from "../ui/BattleUI";
 
 export default function BattleScene() {
@@ -30,7 +30,7 @@ export default function BattleScene() {
         const sprite = k.add([
             k.rect(100, 100),
             k.pos(LAYOUT.ENEMY_CENTER_X + xOffset, LAYOUT.ENEMY_CENTER_Y),
-            k.color(COLORS.enemy),
+            k.color(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy),
             k.anchor("center"),
             "enemy",
             { char: enemy, id: i }
@@ -451,8 +451,10 @@ export default function BattleScene() {
                 source.defend();
                 log.updateLog(`${source.name} Defends!`);
             } else if (type === "FIGHT") {
-                const dmg = target.takeDamage(source.attack);
-                log.updateLog(`${source.name} attacks ${target.name} for ${dmg}!`);
+                const { damage, mult } = target.takeDamage(source.attack, source.attribute);
+                log.updateLog(`${source.name} attacks ${target.name} for ${damage}!`);
+                if (mult > 1) log.updateLog("It's super effective!");
+                if (mult < 1) log.updateLog("It's not very effective...");
                 shakeScreen();
             } else if (type === "SKILL") {
                 if (!skill) {
@@ -487,9 +489,12 @@ export default function BattleScene() {
                     // Effects
                     if (skill.type === "Damage") {
                         // Formula: (Atk + Power) * Variance - Def/2
-                        let calcDmg = Math.floor((source.attack + skill.power) * (0.9 + Math.random() * 0.2) - (t.defense / 2));
-                        calcDmg = Math.max(1, calcDmg);
-                        t.takeDamage(calcDmg);
+                        let baseDmg = Math.floor((source.attack + skill.power) * (0.9 + Math.random() * 0.2));
+                        const { damage, mult } = t.takeDamage(baseDmg, skill.attribute);
+
+                        if (mult > 1) log.updateLog("It's super effective!");
+                        if (mult < 1) log.updateLog("It's not very effective...");
+
                         playAnimation(t, "DAMAGE");
                     } else if (skill.type === "Heal") {
                         t.heal(skill.power);
