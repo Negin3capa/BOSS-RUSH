@@ -1,6 +1,7 @@
 import { BaseCharacter } from "../entities/BaseCharacter";
-import { getRandomSkills } from "../data/skills";
+import { getRandomSkills, getWeightedRandomSkills } from "../data/skills";
 import { GAMEPLAY, ATTRIBUTES } from "../constants";
+import { k } from "../kaplayCtx";
 
 export class GameState {
     constructor() {
@@ -43,28 +44,31 @@ export class GameState {
     generateEnemies() {
         this.enemies = [];
         const enemyAttributes = [ATTRIBUTES.FIRE, ATTRIBUTES.WATER, ATTRIBUTES.WIND, ATTRIBUTES.STONE, ATTRIBUTES.DARK, ATTRIBUTES.LIGHT];
+        const roundNum = this.roundCounter;
+        const isBossRound = roundNum % 3 === 0;
+        const isStrongerRound = roundNum % 3 === 2;
+        const type = isBossRound ? "Boss" : (isStrongerRound ? "Stronger" : "Simple");
+        const count = isBossRound ? 1 : (isStrongerRound ? 2 : k.randi(1, GAMEPLAY.MAX_ENEMIES)); // Using GAMEPLAY.MAX_ENEMIES
 
-        let count = 1;
-        let type = "Simple";
-
-        if (this.roundCounter % 3 === 0) {
-            type = "Boss";
-            count = 1;
-        } else if (this.roundCounter % 3 === 2) {
-            type = "Stronger";
-            count = Math.floor(Math.random() * GAMEPLAY.MAX_ENEMIES) + 1;
-        } else {
-            type = "Simple";
-            count = Math.floor(Math.random() * GAMEPLAY.MAX_ENEMIES) + 1;
-        }
+        // luckFactor increases by 0.5 for every set of 3 rounds (every Boss defeated)
+        const luckFactor = Math.floor((roundNum - 1) / 3) * 0.5;
 
         for (let i = 0; i < count; i++) {
             const stats = this.getEnemyStats(type);
-            const enemyName = type === "Boss" ? "BOSS" : `${type} Enemy ${i + 1}`;
-            const enemy = new BaseCharacter(enemyName, "Enemy", stats);
-            enemy.isBoss = type === "Boss";
-            enemy.attribute = enemyAttributes[Math.floor(Math.random() * enemyAttributes.length)];
-            enemy.skills = getRandomSkills("ANY", 4);
+            const enemyAttribute = enemyAttributes[Math.floor(Math.random() * enemyAttributes.length)]; // Determine attribute here
+            const enemy = new BaseCharacter(
+                isBossRound ? "BOSS" : `Enemy ${i + 1}`,
+                "Enemy", // Role
+                {
+                    hp: stats.hp,
+                    sp: stats.sp,
+                    attack: stats.attack,
+                    defense: stats.defense
+                }
+            );
+            enemy.isBoss = isBossRound;
+            enemy.attribute = enemyAttribute; // Assign the determined attribute
+            enemy.skills = getWeightedRandomSkills("ANY", 3, luckFactor);
             this.enemies.push(enemy);
         }
         return this.enemies;

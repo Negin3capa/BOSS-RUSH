@@ -2,6 +2,7 @@ import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
 import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem } from "../ui/BattleUI";
+import { RARITY_COLORS } from "../data/skills";
 
 export default function BattleScene() {
     // Reset state on restart (enemies regen)
@@ -47,14 +48,10 @@ export default function BattleScene() {
     const enemySprites = gameState.enemies.map((enemy, i) => {
         const xOffset = (i - (gameState.enemies.length - 1) / 2) * 180;
 
-        const sprite = k.add([
-            k.rect(120, 120),
+        // Container for better layering
+        const container = k.add([
             k.pos(LAYOUT.ENEMY_CENTER_X + xOffset, LAYOUT.ENEMY_CENTER_Y),
-            k.color(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy)),
             k.anchor("center"),
-            k.outline(UI.OUTLINE, COLORS.uiBorder),
-            k.scale(1),
-            k.rotate(0),
             "enemy",
             {
                 char: enemy,
@@ -73,22 +70,45 @@ export default function BattleScene() {
             }
         ]);
 
-        // Enemy HP Bar frame
-        sprite.add([
-            k.rect(94, 14),
-            k.pos(0, enemy.isBoss ? -80 : -72), // Lifted up slightly
+        // Selection Border (Red square behind)
+        const border = container.add([
+            k.rect(130, 130),
             k.anchor("center"),
-            k.color(COLORS.uiBackground),
-            k.outline(2, COLORS.uiBorder),
+            k.color(COLORS.hp),
+            k.z(-1),
+        ]);
+        border.hidden = true;
+
+        // Main Visual (Rect)
+        container.add([
+            k.rect(120, 120),
+            k.color(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy)),
+            k.anchor("center"),
+            k.outline(UI.OUTLINE, COLORS.uiBorder),
+            k.z(0),
+        ]);
+
+        // HP Bar Container for conditional visibility
+        const hpBar = container.add([
+            k.pos(0, enemy.isBoss ? -80 : -100), // Moved non-boss up to -100
+            k.z(5),
+        ]);
+        hpBar.hidden = true;
+
+        // Enemy HP Bar frame
+        hpBar.add([
+            k.rect(94, 14),
+            k.anchor("center"),
+            k.color(0, 0, 0), // Black background
+            k.outline(UI.OUTLINE, COLORS.uiBorder),
         ]);
 
         // Enemy HP Bar fill
-        sprite.add([
+        hpBar.add([
             k.rect(90, 10),
-            k.pos(-45, (enemy.isBoss ? -80 : -72) - 5), // Corrected alignment: shift up by (14-10)/2 + 3 (approx) wait. 
-            // Frame is center at Y, so frame baseline is Y-7. Fill is 10 high topleft. 
-            // To center 10 in 14, fill should be at Y-5.
+            k.pos(-45, -5),
             k.color(COLORS.hp),
+            k.z(1),
             {
                 update() {
                     const ratio = enemy.hp / enemy.maxHp;
@@ -98,23 +118,25 @@ export default function BattleScene() {
         ]);
 
         // Status Indicators for Enemies
-        const statusContainer = sprite.add([
-            k.pos(0, enemy.isBoss ? -110 : -100),
+        const statusContainer = container.add([
+            k.pos(0, enemy.isBoss ? -180 : -130), // Adjusted for higher HP bars
             k.anchor("center"),
+            k.z(10),
         ]);
 
         ["attack", "defense"].forEach((stat, idx) => {
             statusContainer.add([
-                k.text("", { size: 24 }),
+                k.text("", { size: 24, font: "Inter" }),
                 k.pos((idx - 0.5) * 40, 0),
                 k.anchor("center"),
+                k.outline(3, [0, 0, 0]),
                 {
                     update() {
                         const effect = enemy.statusEffects.find(e => e.stat === stat);
                         if (effect) {
-                            this.text = effect.type === "BUFF" ? "^" : "v";
+                            this.text = effect.type === "BUFF" ? "↑" : "↓";
                             if (stat === "attack") this.color = k.rgb(240, 80, 120);
-                            if (stat === "defense") this.color = k.rgb(255, 255, 150);
+                            if (stat === "defense") this.color = k.rgb(100, 200, 255);
                         } else {
                             this.text = "";
                         }
@@ -123,7 +145,7 @@ export default function BattleScene() {
             ]);
         });
 
-        return sprite;
+        return { sprite: container, border, hpBar };
     });
 
     const targetCursor = k.add([
@@ -141,19 +163,45 @@ export default function BattleScene() {
     targetCursor.hidden = true;
 
     function updateSelectionVisuals() {
+        // Reset all enemy borders and HP bars
+        enemySprites.forEach(e => {
+            e.border.hidden = true;
+            e.hpBar.hidden = true;
+        });
+
         if (turnPhase === "PLAYER_INPUT" || turnPhase === "SELECT_SKILL") {
             battleUI.updateSelection(currentHeroIndex);
             targetCursor.hidden = true;
         } else if (turnPhase === "SELECT_TARGET") {
-            battleUI.updateSelection(-1);
-            targetCursor.hidden = false;
             if (selectedAction.targetMode === "ALLIES") {
-                const pos = LAYOUT.POSITIONS[selectedEnemyIndex];
-                targetCursor.pos = k.vec2(pos.x + 100, pos.y - 40);
+                targetCursor.hidden = false;
+                if (selectedAction.skill && selectedAction.skill.target === "ALL_ALLIES") {
+                    battleUI.updateSelection("ALL_ALLIES");
+                    targetCursor.pos = k.vec2(SCREEN_WIDTH / 2, 80);
+                } else {
+                    battleUI.updateSelection(selectedEnemyIndex);
+                    const pos = LAYOUT.POSITIONS[selectedEnemyIndex];
+                    targetCursor.pos = k.vec2(pos.x + 100, pos.y - 40);
+                }
             } else {
-                const enemySprite = enemySprites[selectedEnemyIndex];
-                const yOffset = enemySprite.char.isBoss ? 200 : 100;
-                targetCursor.pos = k.vec2(enemySprite.pos.x, enemySprite.pos.y - yOffset);
+                // Enemy Targeting - No Arrow
+                targetCursor.hidden = true;
+                battleUI.updateSelection(-1);
+
+                if (selectedAction.skill && selectedAction.skill.target === "ALL_ENEMIES") {
+                    enemySprites.forEach(e => {
+                        if (!e.sprite.char.isDead) {
+                            e.border.hidden = false;
+                            e.hpBar.hidden = false;
+                        }
+                    });
+                } else {
+                    const targetEnemy = enemySprites[selectedEnemyIndex];
+                    if (targetEnemy) {
+                        targetEnemy.border.hidden = false;
+                        targetEnemy.hpBar.hidden = false;
+                    }
+                }
             }
         } else {
             battleUI.updateSelection(-1);
@@ -190,7 +238,7 @@ export default function BattleScene() {
 
         const enemyIdx = gameState.enemies.indexOf(target);
         if (enemyIdx !== -1) {
-            return enemySprites[enemyIdx].pos;
+            return enemySprites[enemyIdx].sprite.pos;
         }
 
         const partyIdx = gameState.party.indexOf(target);
@@ -205,7 +253,7 @@ export default function BattleScene() {
     // Input Handling
     const actions = ["FIGHT", "SKILL", "DEFEND", "ITEM"];
 
-    k.onKeyPress("left", () => {
+    const handleLeft = () => {
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex % 2 === 1 ? selectedActionIndex - 1 : selectedActionIndex + 1;
         } else if (turnPhase === "SELECT_SKILL") {
@@ -216,9 +264,9 @@ export default function BattleScene() {
             endOptionIndex = 0;
         }
         updateMenuVisuals();
-    });
+    };
 
-    k.onKeyPress("right", () => {
+    const handleRight = () => {
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex % 2 === 0 ? selectedActionIndex + 1 : selectedActionIndex - 1;
         } else if (turnPhase === "SELECT_SKILL") {
@@ -229,44 +277,31 @@ export default function BattleScene() {
             endOptionIndex = 1;
         }
         updateMenuVisuals();
-    });
+    };
 
-    k.onKeyPress("up", () => {
+    const handleUp = () => {
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex >= 2 ? selectedActionIndex - 2 : selectedActionIndex + 2;
         } else if (turnPhase === "SELECT_SKILL") {
             selectedSkillIndex = selectedSkillIndex >= 2 ? selectedSkillIndex - 2 : selectedSkillIndex + 2;
+        } else if (turnPhase === "SELECT_TARGET") {
+            if (selectedAction.targetMode === "ALLIES") cycleTarget(-2);
         }
         updateMenuVisuals();
-    });
+    };
 
-    k.onKeyPress("down", () => {
+    const handleDown = () => {
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex < 2 ? selectedActionIndex + 2 : selectedActionIndex - 2;
         } else if (turnPhase === "SELECT_SKILL") {
             selectedSkillIndex = selectedSkillIndex < 2 ? selectedSkillIndex + 2 : selectedSkillIndex - 2;
+        } else if (turnPhase === "SELECT_TARGET") {
+            if (selectedAction.targetMode === "ALLIES") cycleTarget(2);
         }
         updateMenuVisuals();
-    });
+    };
 
-    function cycleTarget(dir) {
-        if (selectedAction.targetMode === "ALLIES") {
-            let tries = 0;
-            do {
-                selectedEnemyIndex = (selectedEnemyIndex + dir + gameState.party.length) % gameState.party.length;
-                tries++;
-            } while (gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
-        } else {
-            let tries = 0;
-            do {
-                selectedEnemyIndex = (selectedEnemyIndex + dir + enemySprites.length) % enemySprites.length;
-                tries++;
-            } while (enemySprites[selectedEnemyIndex].char.isDead && tries < enemySprites.length);
-        }
-        updateSelectionVisuals();
-    }
-
-    k.onKeyPress("space", () => {
+    const handleConfirm = () => {
         if (turnPhase === "PLAYER_INPUT") {
             lastActionIndexDuringTurn = selectedActionIndex;
             handleActionSelection(actions[selectedActionIndex]);
@@ -284,20 +319,61 @@ export default function BattleScene() {
             }
             else k.go("main");
         }
-    });
+    };
 
-    k.onKeyPress("backspace", () => {
-        if (turnPhase === "SELECT_SKILL") turnPhase = "PLAYER_INPUT";
-        else if (turnPhase === "SELECT_TARGET") {
-            turnPhase = selectedAction.type === "SKILL" ? "SELECT_SKILL" : "PLAYER_INPUT";
+    const handleBack = () => {
+        if (turnPhase === "SELECT_SKILL") {
+            turnPhase = "PLAYER_INPUT";
+            updateMenuVisuals();
+        } else if (turnPhase === "SELECT_TARGET") {
+            turnPhase = (selectedAction && selectedAction.type === "SKILL") ? "SELECT_SKILL" : "PLAYER_INPUT";
+            updateMenuVisuals();
+        } else if (turnPhase === "PLAYER_INPUT" && currentHeroIndex > 0) {
+            // Undo logic
+            playerActions.pop();
+            do {
+                currentHeroIndex--;
+            } while (currentHeroIndex > 0 && gameState.party[currentHeroIndex].isDead);
+
+            // Re-sync UI state to last hero's choice (optional, but good for UX)
+            selectedActionIndex = lastActionIndexDuringTurn;
+            updateMenuVisuals();
         }
-        updateMenuVisuals();
-    });
+    };
+
+    // Bind inputs
+    ["left", "a"].forEach(key => k.onKeyPress(key, handleLeft));
+    ["right", "d"].forEach(key => k.onKeyPress(key, handleRight));
+    ["up", "w"].forEach(key => k.onKeyPress(key, handleUp));
+    ["down", "s"].forEach(key => k.onKeyPress(key, handleDown));
+    ["space", "enter"].forEach(key => k.onKeyPress(key, handleConfirm));
+    ["backspace", "shift", "escape"].forEach(key => k.onKeyPress(key, handleBack));
+
+    function cycleTarget(dir) {
+        if (selectedAction.targetMode === "ALLIES") {
+            let tries = 0;
+            // Party navigation: 0=TL, 1=TR, 2=BL, 3=BR
+            // Left/Right is +/- 1 mod 4
+            // Up/Down is +/- 2 mod 4
+            do {
+                selectedEnemyIndex = (selectedEnemyIndex + dir + gameState.party.length) % gameState.party.length;
+                tries++;
+            } while (gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
+        } else {
+            // Enemies are in a single row, so up/down doesn't do much but left/right cycles
+            let tries = 0;
+            do {
+                selectedEnemyIndex = (selectedEnemyIndex + dir + enemySprites.length) % enemySprites.length;
+                tries++;
+            } while (enemySprites[selectedEnemyIndex].sprite.char.isDead && tries < enemySprites.length);
+        }
+        updateSelectionVisuals();
+    }
 
     function updateMenuVisuals() {
         if (turnPhase === "PLAYER_INPUT") {
             const hero = gameState.party[currentHeroIndex];
-            log.updateLog(`What will ${hero.name} do?`, true);
+            log.updateLog(`What will ${hero.name} do?`, true, COLORS.text);
             menuSystem.show();
             menuSystem.updateMainMenu(selectedActionIndex);
         } else if (turnPhase === "SELECT_SKILL") {
@@ -330,21 +406,31 @@ export default function BattleScene() {
         selectedAction = { type: "SKILL", skill, source: hero };
         if (skill.target === "ONE_ENEMY") startTargeting("SKILL", "ENEMIES");
         else if (skill.target === "ONE_ALLY") startTargeting("SKILL", "ALLIES");
-        else if (skill.target === "ALL_ENEMIES") commitAction({ ...selectedAction, target: "ALL_ENEMIES" });
-        else if (skill.target === "ALL_ALLIES") commitAction({ ...selectedAction, target: "ALL_ALLIES" });
+        else if (skill.target === "ALL_ENEMIES") startTargeting("SKILL", "ENEMIES"); // Now enter targeting phase for AOE
+        else if (skill.target === "ALL_ALLIES") startTargeting("SKILL", "ALLIES");  // Now enter targeting phase for AOE
         else commitAction({ ...selectedAction, target: hero });
     }
 
     function startTargeting(type, mode) {
         if (type !== "SKILL") selectedAction = { type };
         selectedAction.targetMode = mode;
-        selectedEnemyIndex = mode === "ENEMIES" ? enemySprites.findIndex(s => !s.char.isDead) : 0;
+        selectedEnemyIndex = mode === "ENEMIES" ? enemySprites.findIndex(s => !s.sprite.char.isDead) : 0;
+        if (selectedEnemyIndex === -1 && mode === "ENEMIES") selectedEnemyIndex = 0;
         turnPhase = "SELECT_TARGET";
         updateMenuVisuals();
     }
 
     function confirmTarget() {
-        const target = selectedAction.targetMode === "ALLIES" ? gameState.party[selectedEnemyIndex] : enemySprites[selectedEnemyIndex].char;
+        // Handle AOE targets
+        let target;
+        if (selectedAction.skill) {
+            if (selectedAction.skill.target === "ALL_ENEMIES") target = "ALL_ENEMIES";
+            else if (selectedAction.skill.target === "ALL_ALLIES") target = "ALL_ALLIES";
+            else target = selectedAction.targetMode === "ALLIES" ? gameState.party[selectedEnemyIndex] : enemySprites[selectedEnemyIndex].sprite.char;
+        } else {
+            target = selectedAction.targetMode === "ALLIES" ? gameState.party[selectedEnemyIndex] : enemySprites[selectedEnemyIndex].sprite.char;
+        }
+
         commitAction({ ...selectedAction, source: gameState.party[currentHeroIndex], target });
     }
 
@@ -368,7 +454,7 @@ export default function BattleScene() {
         } else {
             turnPhase = "PLAYER_INPUT";
             updateMenuVisuals();
-            log.updateLog(`What will ${gameState.party[currentHeroIndex].name} do?`, false);
+            log.updateLog(`What will ${gameState.party[currentHeroIndex].name} do?`, false, COLORS.text);
         }
     }
 
@@ -410,6 +496,15 @@ export default function BattleScene() {
     async function performAction(action) {
         let { type, source, target, skill } = action;
 
+        // Reset enemy HP bar visibility
+        enemySprites.forEach(e => e.hpBar.hidden = true);
+
+        // Helper to show target HP bar
+        const showTargetHp = (t) => {
+            const idx = gameState.enemies.indexOf(t);
+            if (idx !== -1) enemySprites[idx].hpBar.hidden = false;
+        };
+
         // Target Redirection Logic: If single target is dead, redirect to another alive target in the same group
         if (target && target.isDead && target !== "ALL_ENEMIES" && target !== "ALL_ALLIES") {
             const isEnemyGroup = gameState.enemies.includes(target);
@@ -418,15 +513,17 @@ export default function BattleScene() {
 
             if (aliveTargets.length > 0) {
                 target = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
-                log.updateLog(`${source.name} redirects attack to ${target.name}!`);
-                await k.wait(0.4);
+                log.updateLog(`${source.name} redirects attack to ${target.name}!`, false);
+                await k.wait(0.6);
             } else {
-                // If no one is alive, the action is cancelled or handled by the execution loop continue checks
                 return;
             }
         }
 
-        log.updateLog(`${source.name} uses ${type === "SKILL" ? skill.name : type}!`);
+        const rarityTag = (type === "SKILL" && skill) ? skill.rarity : null;
+        const skillNameFormatted = rarityTag ? `[${rarityTag}]${skill.name}[/${rarityTag}]` : (type === "SKILL" ? skill.name : type);
+        log.updateLog(`${source.name} uses ${skillNameFormatted}!`, false);
+        await k.wait(0.5);
 
         const targetPos = getTargetPos(target);
 
@@ -436,6 +533,7 @@ export default function BattleScene() {
 
             targets.forEach(t => {
                 if (!t || t.isDead) return;
+                showTargetHp(t);
                 const basePower = (type === "FIGHT" || !skill) ? source.attack : source.attack + skill.power;
                 t.takeDamage(basePower, (type === "SKILL" && skill) ? skill.attribute : source.attribute);
             });
@@ -453,7 +551,7 @@ export default function BattleScene() {
             });
             if (skill) {
                 await k.wait(0.4);
-                log.updateLog(`${source.name} used ${skill.name}. ${target.name || "Party"} healed ${amount} HP!`);
+                log.updateLog(`${source.name} used ${skillNameFormatted}. ${target.name || "Party"} healed ${amount} HP!`, false);
             }
         } else if (type === "SKILL" && (skill.type === "Buff" || skill.type === "Debuff")) {
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) :
@@ -471,6 +569,7 @@ export default function BattleScene() {
 
             targets.forEach(t => {
                 if (!t || t.isDead) return;
+                showTargetHp(t);
                 if (skill.effect) {
                     t.addStatusEffect({
                         stat: skill.effect.stat,
@@ -484,13 +583,16 @@ export default function BattleScene() {
             await k.wait(0.4);
             const change = isBuff ? "increased" : "decreased";
             const statName = skill.effect ? skill.effect.stat : "stats";
-            log.updateLog(`${source.name} used ${skill.name}. ${target.name || "Target"}'s ${statName} ${change}!`);
+            log.updateLog(`${source.name} used ${skillNameFormatted}. ${target.name || "Target"}'s ${statName} ${change}!`, false);
         }
 
         if (type === "SKILL" && skill) source.costSp(skill.spCost);
 
-        enemySprites.forEach(s => s.opacity = s.char.isDead ? 0.3 : 1);
+        enemySprites.forEach(e => e.sprite.opacity = e.sprite.char.isDead ? 0.3 : 1);
         await k.wait(0.4);
+
+        // Hide enemy HP bars after action
+        enemySprites.forEach(e => e.hpBar.hidden = true);
     }
 
     function startNewRound() {

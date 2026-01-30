@@ -1,5 +1,6 @@
 import k from "../kaplayCtx";
 import { COLORS, LAYOUT, SCREEN_WIDTH, SCREEN_HEIGHT, UI } from "../constants";
+import { RARITY_COLORS } from "../data/skills";
 
 export function createBattleUI(gameState) {
     const uiContainer = k.add([
@@ -143,17 +144,17 @@ export function createBattleUI(gameState) {
 
         const statusIcons = ["attack", "defense"].map((stat, i) => {
             return statusContainer.add([
-                k.text("", { size: 24, font: "Viga" }),
+                k.text("", { size: 24, font: "Inter" }), // Switched to Inter for better character support
                 k.pos(i * 20, 0),
                 k.anchor("center"),
-                k.outline(2, [255, 255, 255]),
+                k.outline(3, [0, 0, 0]), // Dark outline for better visibility on all backgrounds
                 {
                     update() {
                         const effect = char.statusEffects.find(e => e.stat === stat);
                         if (effect) {
-                            this.text = effect.type === "BUFF" ? "^" : "v";
-                            if (stat === "attack") this.color = k.rgb(240, 80, 120);
-                            if (stat === "defense") this.color = k.rgb(100, 150, 255); // Changed defense color slightly for better visibility
+                            this.text = effect.type === "BUFF" ? "↑" : "↓";
+                            if (stat === "attack") this.color = k.rgb(240, 80, 120); // Pinkish red
+                            if (stat === "defense") this.color = k.rgb(100, 200, 255); // Sky blue
                         } else {
                             this.text = "";
                         }
@@ -187,13 +188,30 @@ export function createBattleUI(gameState) {
 
     return {
         ui: uiContainer,
-        updateSelection(activeIndex) {
+        updateSelection(selection) {
             portraitUIs.forEach((p, i) => {
-                p.selectionBorder.hidden = (i !== activeIndex);
+                let isSelected = false;
+                if (Array.isArray(selection)) {
+                    isSelected = selection.includes(i);
+                } else if (selection === "ALL_ALLIES") {
+                    isSelected = !gameState.party[i].isDead;
+                } else {
+                    isSelected = (i === selection);
+                }
+                p.selectionBorder.hidden = !isSelected;
             });
         }
     };
 }
+
+const GET_TEXT_STYLES = () => {
+    const styles = {};
+    Object.keys(RARITY_COLORS).forEach(rarity => {
+        const c = RARITY_COLORS[rarity];
+        styles[rarity] = { color: k.rgb(c[0], c[1], c[2]) };
+    });
+    return styles;
+};
 
 export function createMessageLog() {
     const frame = k.add([
@@ -207,7 +225,11 @@ export function createMessageLog() {
     ]);
 
     const logText = k.add([
-        k.text("What will you do?", { size: 28, font: "Viga" }),
+        k.text("What will you do?", {
+            size: 28,
+            font: "Viga",
+            styles: GET_TEXT_STYLES()
+        }),
         k.pos(SCREEN_WIDTH / 2, 60),
         k.anchor("center"),
         k.color(COLORS.text),
@@ -216,7 +238,6 @@ export function createMessageLog() {
         k.scale(1),
         {
             updateLog(msg, noPunch = false) {
-                if (this.text === msg) return; // Ignore identical messages to avoid jitter
                 this.text = msg;
                 if (!noPunch) {
                     this.scale = k.vec2(UI.PUNCH_SCALE);
@@ -308,7 +329,12 @@ export function createMenuSystem() {
     infoBox.hidden = true;
 
     const infoText = infoBox.add([
-        k.text("", { size: 16, width: 480, font: "Inter" }),
+        k.text("", {
+            size: 16,
+            width: 480,
+            font: "Inter",
+            styles: GET_TEXT_STYLES()
+        }),
         k.anchor("center"),
         k.color(COLORS.text),
     ]);
@@ -326,10 +352,33 @@ export function createMenuSystem() {
         k.color(COLORS.text),
     ]);
 
+    // Skill Slots for independent coloring
+    const skillSlots = [];
+    const slotPositions = [
+        k.vec2(-140, -18), k.vec2(140, -18),
+        k.vec2(-140, 22), k.vec2(140, 22)
+    ];
+
+    for (let i = 0; i < 4; i++) {
+        const slot = mainMenuWindow.add([
+            k.text("", {
+                size: 24,
+                font: "Viga",
+                styles: GET_TEXT_STYLES()
+            }),
+            k.pos(slotPositions[i]),
+            k.anchor("center"),
+        ]);
+        skillSlots.push(slot);
+    }
+
     return {
         updateMainMenu(selectedIndex) {
             infoBox.hidden = true;
             menuContainer.hidden = false;
+            skillSlots.forEach(s => s.text = "");
+            mainMenuText.hidden = false;
+
             const formatBtn = (i, label) => (i === selectedIndex ? `> ${label} <` : `  ${label}  `);
             const row1 = `${formatBtn(0, "FIGHT")}    ${formatBtn(1, "SKILL")}`;
             const row2 = `${formatBtn(2, "DEFEND")}    ${formatBtn(3, "ITEM")}`;
@@ -338,27 +387,32 @@ export function createMenuSystem() {
         updateSkillMenu(skills, selectedIndex) {
             infoBox.hidden = false;
             menuContainer.hidden = false;
+            mainMenuText.hidden = true;
+
             if (!skills || skills.length === 0) {
-                mainMenuText.text = "No Skills";
+                skillSlots[0].text = "No Skills";
+                skillSlots[0].color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+                [1, 2, 3].forEach(i => skillSlots[i].text = "");
                 return;
             }
 
-            const rows = [];
-            for (let i = 0; i < 4; i += 2) {
-                const s1 = skills[i];
-                const s2 = skills[i + 1];
-                const formatSkill = (skill, idx) => {
-                    if (!skill) return "   ---   ";
-                    const cursor = (idx === selectedIndex) ? ">" : " ";
-                    return `${cursor} ${skill.name} ${cursor}`;
-                };
-                rows.push(`${formatSkill(s1, i)}    ${formatSkill(s2, i + 1)}`);
-            }
-            mainMenuText.text = rows.join("\n");
+            skillSlots.forEach((slot, i) => {
+                const skill = skills[i];
+                if (!skill) {
+                    slot.text = "   ---   ";
+                    slot.color = k.rgb(100, 100, 100);
+                    return;
+                }
+                const cursor = (i === selectedIndex) ? ">" : " ";
+                // Just wrap the name in rarity tag
+                slot.text = `${cursor} [${skill.rarity}]${skill.name}[/${skill.rarity}] ${cursor}`;
+                slot.color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]); // Default text color
+            });
 
             const selectedSkill = skills[selectedIndex];
             if (selectedSkill) {
-                infoText.text = `${selectedSkill.name.toUpperCase()} (${selectedSkill.spCost} SP)\n${selectedSkill.description}`;
+                infoText.text = `${selectedSkill.name.toUpperCase()} [[${selectedSkill.rarity}]${selectedSkill.rarity}[/${selectedSkill.rarity}]]\n(${selectedSkill.spCost} SP) ${selectedSkill.description}`;
+                infoText.color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]); // Default text color
             }
         },
         hide() {
