@@ -263,19 +263,23 @@ export default function BattleScene() {
         if (!target || target === "ALL_ENEMIES" || target === "ALL_ALLIES") {
             return k.vec2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
         }
-
-        const enemyIdx = gameState.enemies.indexOf(target);
-        if (enemyIdx !== -1) {
-            return enemySprites[enemyIdx].sprite.pos;
+        if (gameState.party.includes(target)) {
+            const idx = gameState.party.indexOf(target);
+            return k.vec2(LAYOUT.POSITIONS[idx].x + 100, LAYOUT.POSITIONS[idx].y - 20);
         }
-
-        const partyIdx = gameState.party.indexOf(target);
-        if (partyIdx !== -1) {
-            const layoutPos = LAYOUT.POSITIONS[partyIdx];
-            return k.vec2(layoutPos.x + 100, layoutPos.y + 50);
+        const idx = gameState.enemies.indexOf(target);
+        if (idx !== -1) {
+            return enemySprites[idx].sprite.pos;
         }
-
         return k.vec2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+    }
+
+    function getActionPriority(action) {
+        const { type, skill } = action;
+        if (type === "SKILL" && skill && skill.isSpeedScaling) return 3;
+        if (type === "DEFEND") return 2;
+        if (type === "SKILL" && skill && (skill.type === "Heal" || skill.type === "Buff" || skill.type === "Debuff")) return 1;
+        return 0;
     }
 
     // Input Handling
@@ -503,8 +507,14 @@ export default function BattleScene() {
             if (enemyAction) allActions.push(enemyAction);
         }
 
-        // Sort by speed
-        allActions.sort((a, b) => b.source.effectiveSpeed - a.source.effectiveSpeed);
+        // Phase 2: Execution
+        // Sort by priority first, then speed
+        allActions.sort((a, b) => {
+            const prioA = getActionPriority(a);
+            const prioB = getActionPriority(b);
+            if (prioA !== prioB) return prioB - prioA;
+            return b.source.effectiveSpeed - a.source.effectiveSpeed;
+        });
 
         // Phase 2: Execute
         for (const action of allActions) {
@@ -587,9 +597,15 @@ export default function BattleScene() {
                 showTargetHp(t);
 
                 // Use Attack for Physical/Fight, SpecialAttack for Elemental Skills
-                const isPhysical = !isSkill || skill.attribute === ATTRIBUTES.PHYSICAL;
-                const srcStat = isPhysical ? source.effectiveAttack : source.effectiveSpecialAttack;
-                const basePower = isSkill ? srcStat + skill.power : srcStat;
+                // Special case: Speed-Scaling skills use Speed instead of Attack
+                const isPhysical = !isSkill || (skill && skill.attribute === ATTRIBUTES.PHYSICAL);
+                let srcStat = 0;
+                if (isSkill && skill && skill.isSpeedScaling) {
+                    srcStat = source.effectiveSpeed;
+                } else {
+                    srcStat = isPhysical ? source.effectiveAttack : source.effectiveSpecialAttack;
+                }
+                const basePower = (srcStat * 0.5) + (isSkill ? skill.power : 15);
 
                 const result = t.takeDamage(basePower, isSkill ? skill.attribute : source.attribute, source, isSkill);
 

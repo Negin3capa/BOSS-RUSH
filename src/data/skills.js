@@ -39,8 +39,8 @@ const TARGETS = {
 };
 
 // Helper to create skills
-function createSkill(id, name, className, type, attribute, mpCost, power, target, description, rarity = RARITIES.COMMON, effect = null) {
-    return { id, name, className, type, attribute, mpCost, power, target, description, rarity, effect };
+function createSkill(id, name, className, type, attribute, mpCost, power, target, description, rarity = RARITIES.COMMON, effect = null, isSpeedScaling = false) {
+    return { id, name, className, type, attribute, mpCost, power, target, description, rarity, effect, isSpeedScaling };
 }
 
 // --- HERO SKILLS ---
@@ -57,7 +57,8 @@ const HERO_SKILLS = [
     createSkill("h10", "Holy Nova", "Hero", "Damage", ATTRIBUTES.LIGHT, 30, 45, TARGETS.ALL_ENEMIES, "Holy explosion.", RARITIES.EXOTIC),
     createSkill("h18", "Full Heal", "Hero", "Heal", ATTRIBUTES.HEALING, 30, 100, TARGETS.ONE_ALLY, "Fully restores HP.", RARITIES.LEGENDARY),
     createSkill("h19", "Light Storm", "Hero", "Damage", ATTRIBUTES.LIGHT, 40, 70, TARGETS.ALL_ENEMIES, "Rain of light swords.", RARITIES.LEGENDARY),
-    createSkill("h20", "Heroic Strike", "Hero", "Damage", ATTRIBUTES.PHYSICAL, 50, 100, TARGETS.ONE_ENEMY, "The ultimate technique.", RARITIES.MYTHICAL)
+    createSkill("h20", "Heroic Strike", "Hero", "Damage", ATTRIBUTES.PHYSICAL, 50, 100, TARGETS.ONE_ENEMY, "The ultimate technique.", RARITIES.MYTHICAL),
+    createSkill("h21", "Quick Slash", "Hero", "Damage", ATTRIBUTES.PHYSICAL, 10, 20, TARGETS.ONE_ENEMY, "A prioritary strike (+3 Prio).", RARITIES.UNCOMMON, null, true)
 ];
 
 // --- TANK SKILLS ---
@@ -86,12 +87,13 @@ const MAGE_SKILLS = [
 
 // --- ROGUE SKILLS ---
 const ROGUE_SKILLS = [
-    createSkill("r1", "Quick Stab", "Rogue", "Damage", ATTRIBUTES.PHYSICAL, 5, 20, TARGETS.ONE_ENEMY, "Very fast poke.", RARITIES.COMMON),
+    createSkill("r1", "Quick Stab", "Rogue", "Damage", ATTRIBUTES.PHYSICAL, 5, 20, TARGETS.ONE_ENEMY, "Very fast poke.", RARITIES.COMMON, null, true),
     createSkill("r2", "Backstab", "Rogue", "Damage", ATTRIBUTES.PHYSICAL, 15, 50, TARGETS.ONE_ENEMY, "High damage.", RARITIES.RARE),
     createSkill("r8", "Smoke Bomb", "Rogue", "Debuff", ATTRIBUTES.WIND, 15, 0, TARGETS.ALL_ENEMIES, "Lower Enemy Defense.", RARITIES.UNCOMMON, { stat: "defense", amount: 0.8 }),
     createSkill("r10", "Assassinate", "Rogue", "Damage", ATTRIBUTES.DARK, 40, 90, TARGETS.ONE_ENEMY, "Lethal strike.", RARITIES.EXOTIC),
     createSkill("r13", "Flashbang", "Rogue", "Debuff", ATTRIBUTES.LIGHT, 20, 0, TARGETS.ALL_ENEMIES, "Lower Enemy Attack.", RARITIES.UNCOMMON, { stat: "attack", amount: 0.7 }),
-    createSkill("r20", "Death Blossom", "Rogue", "Damage", ATTRIBUTES.DARK, 50, 100, TARGETS.ALL_ENEMIES, "Spinning execution.", RARITIES.MYTHICAL)
+    createSkill("r20", "Death Blossom", "Rogue", "Damage", ATTRIBUTES.DARK, 50, 100, TARGETS.ALL_ENEMIES, "Spinning execution.", RARITIES.MYTHICAL),
+    createSkill("r21", "Gale Strike", "Rogue", "Damage", ATTRIBUTES.WIND, 15, 30, TARGETS.ONE_ENEMY, "Extremely fast blow (+3 Prio).", RARITIES.RARE, null, true)
 ];
 
 SKILL_DATA.push(...HERO_SKILLS, ...TANK_SKILLS, ...MAGE_SKILLS, ...ROGUE_SKILLS);
