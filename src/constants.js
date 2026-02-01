@@ -19,7 +19,7 @@ export const COLORS = {
     text: [20, 20, 25],             // Dark Ink
     highlight: [240, 80, 120],      // OMORI Pink
     hp: [240, 80, 120],            // Pink
-    sp: [80, 240, 210],            // Teal
+    mp: [80, 240, 210],            // Teal
     enemy: [200, 80, 80],
     player: [80, 180, 80],
     uiBorder: [0, 0, 0],            // Black
@@ -59,7 +59,7 @@ export const ELEMENTAL_CHART = {
 // Gameplay Constants
 export const GAMEPLAY = {
     DEFEND_DAMAGE_REDUCTION: 0.5,
-    DEFEND_SP_REGEN: 10,
+    DEFEND_MP_REGEN: 10,
     ITEM_HEAL_MIN: 20,
     ITEM_HEAL_MAX: 50,
     MAX_ENEMIES: 3,

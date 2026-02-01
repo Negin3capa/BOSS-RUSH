@@ -63,9 +63,10 @@ export function createBattleUI(gameState) {
         const barWidth = LAYOUT.BAR_WIDTH - 25;
 
         container.add([
-            k.text("❤", { size: 16 }),
-            k.pos(barX, hpY + 2),
-            k.color(COLORS.hp),
+            k.sprite("heart"),
+            k.pos(barX + 10, hpY + 7.5),
+            k.anchor("center"),
+            k.scale(0.025), // Adjusted scale to fit 15px height bar better
         ]);
 
         container.add([
@@ -99,41 +100,42 @@ export function createBattleUI(gameState) {
             }
         ]);
 
-        // SP Bar
-        const spY = 74;
+        // MP Bar
+        const mpY = 74;
 
         container.add([
-            k.text("💧", { size: 16 }),
-            k.pos(barX, spY + 2),
-            k.color(COLORS.sp),
+            k.sprite("droplet"),
+            k.pos(barX + 10, mpY + 7.5),
+            k.anchor("center"),
+            k.scale(0.025),
         ]);
 
         container.add([
             k.rect(barWidth, LAYOUT.BAR_HEIGHT),
-            k.pos(barX + 25, spY),
+            k.pos(barX + 25, mpY),
             k.color(COLORS.uiBorder),
         ]);
 
-        const spFill = container.add([
+        const mpFill = container.add([
             k.rect(barWidth - 4, LAYOUT.BAR_HEIGHT - 4),
-            k.pos(barX + 27, spY + 2),
-            k.color(COLORS.sp),
+            k.pos(barX + 27, mpY + 2),
+            k.color(COLORS.mp),
             {
                 update() {
-                    const targetWidth = (char.sp / char.maxSp) * (barWidth - 4);
+                    const targetWidth = (char.mp / char.maxMp) * (barWidth - 4);
                     this.width = k.lerp(this.width, Math.max(0, targetWidth), k.dt() * 10);
                 }
             }
         ]);
 
-        const spText = container.add([
-            k.text(`${Math.floor(char.sp)}/${char.maxSp}`, { size: 12, font: "Inter" }),
-            k.pos(barX + 25, spY + 16),
+        const mpText = container.add([
+            k.text(`${Math.floor(char.mp)}/${char.maxMp}`, { size: 12, font: "Inter" }),
+            k.pos(barX + 25, mpY + 16),
             k.color(COLORS.text),
             {
                 update() {
-                    const currentSp = Math.max(0, Math.floor(char.sp));
-                    this.text = `${currentSp}/${char.maxSp}`;
+                    const currentMp = Math.max(0, Math.floor(char.mp));
+                    this.text = `${currentMp}/${char.maxMp}`;
                 }
             }
         ]);
@@ -412,7 +414,7 @@ export function createMenuSystem() {
 
             const selectedSkill = skills[selectedIndex];
             if (selectedSkill) {
-                infoText.text = `${selectedSkill.name.toUpperCase()} [[${selectedSkill.rarity}]${selectedSkill.rarity}[/${selectedSkill.rarity}]]\n(${selectedSkill.spCost} SP) ${selectedSkill.description}`;
+                infoText.text = `${selectedSkill.name.toUpperCase()} [[${selectedSkill.rarity}]${selectedSkill.rarity}[/${selectedSkill.rarity}]]\n(${selectedSkill.mpCost} MP) ${selectedSkill.description}`;
                 infoText.color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]); // Default text color
             }
         },

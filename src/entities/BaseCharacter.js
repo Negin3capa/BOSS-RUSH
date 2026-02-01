@@ -6,38 +6,44 @@ export class BaseCharacter {
         this.className = className;
         this.skills = []; // Assigned later via GameState
 
-        // Default attribute
+        // Specific attributes
         this.attribute = ATTRIBUTES.PHYSICAL;
 
-        // Randomize stats within a range (e.g., +/- 20% variance) to keep them relative but unique
+        // Stats
         this.maxHp = this.randomizeStat(baseStats.hp);
         this.hp = this.maxHp;
 
-        this.maxSp = this.randomizeStat(baseStats.sp);
-        this.sp = this.maxSp;
+        this.maxMp = this.randomizeStat(baseStats.mp);
+        this.mp = this.maxMp;
 
         this.attack = this.randomizeStat(baseStats.attack);
         this.defense = this.randomizeStat(baseStats.defense);
+        this.specialAttack = this.randomizeStat(baseStats.specialAttack || 10);
+        this.specialDefense = this.randomizeStat(baseStats.specialDefense || 10);
+        this.speed = this.randomizeStat(baseStats.speed || 10);
+        this.accuracy = this.randomizeStat(baseStats.accuracy || 100);
+        this.luck = this.randomizeStat(baseStats.luck || 5);
 
         this.isDead = false;
         this.isDefending = false;
-        this.statusEffects = []; // { stat: 'attack'|'defense', amount: 1.5, duration: 3, type: 'BUFF'|'DEBUFF' }
+        this.statusEffects = []; // { stat: 'attack'|'defense'|..., amount: 1.5, duration: 3, type: 'BUFF'|'DEBUFF' }
     }
 
-    get effectiveAttack() {
-        let multiplier = 1.0;
-        this.statusEffects.forEach(effect => {
-            if (effect.stat === "attack") multiplier *= effect.amount;
-        });
-        return Math.floor(this.attack * multiplier);
-    }
+    get effectiveAttack() { return this.getEffectiveStat("attack"); }
+    get effectiveDefense() { return this.getEffectiveStat("defense"); }
+    get effectiveSpecialAttack() { return this.getEffectiveStat("specialAttack"); }
+    get effectiveSpecialDefense() { return this.getEffectiveStat("specialDefense"); }
+    get effectiveSpeed() { return this.getEffectiveStat("speed"); }
+    get effectiveAccuracy() { return this.getEffectiveStat("accuracy"); }
+    get effectiveLuck() { return this.getEffectiveStat("luck"); }
 
-    get effectiveDefense() {
+    getEffectiveStat(statName) {
         let multiplier = 1.0;
         this.statusEffects.forEach(effect => {
-            if (effect.stat === "defense") multiplier *= effect.amount;
+            if (effect.stat === statName) multiplier *= effect.amount;
         });
-        return Math.floor(this.defense * multiplier);
+        const base = this[statName];
+        return Math.floor(base * multiplier);
     }
 
     randomizeStat(value) {
@@ -68,29 +74,63 @@ export class BaseCharacter {
         this.statusEffects = this.statusEffects.filter(e => e.duration > 0);
     }
 
-    takeDamage(amount, attackAttribute = ATTRIBUTES.PHYSICAL) {
-        // If already dead, don't take more damage (overkill depth is set at moment of death)
-        if (this.isDead) return { damage: 0, mult: 1 };
+    takeDamage(amount, attackAttribute = ATTRIBUTES.PHYSICAL, attacker = null, isSkill = false) {
+        if (this.isDead) return { damage: 0, mult: 1, hit: false, crit: false };
 
-        let multiplier = 1.0;
-        if (ELEMENTAL_CHART[attackAttribute] && ELEMENTAL_CHART[attackAttribute][this.attribute]) {
-            multiplier = ELEMENTAL_CHART[attackAttribute][this.attribute];
+        // 1. Hit/Dodge Logic
+        let hitChance = 100;
+        if (attacker) {
+            // Accuracy boosts hit, Speed boosts dodge
+            // Base formula: 90 + (Acc * 0.1) - (EnemySpeed * 0.1)
+            hitChance = 90 + (attacker.effectiveAccuracy * 0.1) - (this.effectiveSpeed * 0.1);
+        }
+        hitChance = Math.min(100, Math.max(5, hitChance));
+
+        if (Math.random() * 100 > hitChance) {
+            return { damage: 0, mult: 1, hit: false, crit: false };
         }
 
-        let actualDamage = (amount * multiplier) - (this.effectiveDefense / 2);
+        // 2. Critical Hit Logic (Physical Only)
+        let isCrit = false;
+        if (!isSkill || attackAttribute === ATTRIBUTES.PHYSICAL) {
+            const critChance = (attacker ? attacker.effectiveLuck : 0) * 0.5 + (attacker ? attacker.effectiveAccuracy : 0) * 0.1;
+            if (Math.random() * 100 < critChance) {
+                isCrit = true;
+            }
+        }
+
+        // 3. Multiplier Logic (Elemental Skills Only)
+        let multiplier = 1.0;
+        if (isSkill && attackAttribute !== ATTRIBUTES.PHYSICAL) {
+            if (ELEMENTAL_CHART[attackAttribute] && ELEMENTAL_CHART[attackAttribute][this.attribute]) {
+                multiplier = ELEMENTAL_CHART[attackAttribute][this.attribute];
+            }
+        }
+
+        // 4. Defense Logic
+        // Physical attacks use defense, crits ignore 50%. Elemental use specialDefense.
+        let defValue = 0;
+        if (!isSkill || attackAttribute === ATTRIBUTES.PHYSICAL) {
+            defValue = this.effectiveDefense;
+            if (isCrit) defValue *= 0.5;
+        } else {
+            defValue = this.effectiveSpecialDefense;
+        }
+
+        let actualDamage = (amount * multiplier) - (defValue / 2);
         if (this.isDefending) {
             actualDamage *= GAMEPLAY.DEFEND_DAMAGE_REDUCTION;
         }
 
-        actualDamage = Math.max(1, Math.floor(actualDamage)); // Minimum 1 damage
+        actualDamage = Math.max(1, Math.floor(actualDamage));
 
         this.hp -= actualDamage;
         if (this.hp <= 0) {
             this.isDead = true;
-            this.statusEffects = []; // Clear on death
+            this.statusEffects = [];
         }
 
-        return { damage: actualDamage, mult: multiplier };
+        return { damage: actualDamage, mult: multiplier, hit: true, crit: isCrit };
     }
 
     heal(amount) {
@@ -101,14 +141,14 @@ export class BaseCharacter {
         }
     }
 
-    restoreSp(amount) {
+    restoreMp(amount) {
         if (this.isDead) return;
-        this.sp = Math.min(this.maxSp, this.sp + amount);
+        this.mp = Math.min(this.maxMp, this.mp + amount);
     }
 
-    costSp(amount) {
-        if (this.sp >= amount) {
-            this.sp -= amount;
+    costMp(amount) {
+        if (this.mp >= amount) {
+            this.mp -= amount;
             return true;
         }
         return false;
@@ -116,7 +156,7 @@ export class BaseCharacter {
 
     defend() {
         this.isDefending = true;
-        this.restoreSp(GAMEPLAY.DEFEND_SP_REGEN);
+        this.restoreMp(GAMEPLAY.DEFEND_MP_REGEN);
     }
 
     resetTurn() {

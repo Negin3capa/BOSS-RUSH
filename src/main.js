@@ -8,6 +8,8 @@ k.loadFont("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVM
 
 // Load Sprites
 k.loadSprite("nebula", "/nebula.png");
+k.loadSprite("heart", "/heart_icon.png");
+k.loadSprite("droplet", "/droplet_icon.png");
 
 k.scene("main", MainScreen);
 k.scene("battle", BattleScene);

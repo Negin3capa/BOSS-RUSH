@@ -180,7 +180,7 @@ export default function BattleScene() {
         if (turnPhase === "PLAYER_INPUT" || turnPhase === "SELECT_SKILL") {
             battleUI.updateSelection(currentHeroIndex);
             targetCursor.hidden = true;
-        } else if (turnPhase === "SELECT_TARGET") {
+        } else if (turnPhase === "SELECT_TARGET" && selectedAction) {
             if (selectedAction.targetMode === "ALLIES") {
                 targetCursor.hidden = false;
                 if (selectedAction.skill && selectedAction.skill.target === "ALL_ALLIES") {
@@ -237,6 +237,26 @@ export default function BattleScene() {
                 }
             ]);
         }
+    }
+
+    function spawnNumbers(pos, amount, size, color) {
+        if (!pos) return;
+        const n = k.add([
+            k.text(amount.toString(), { size, font: "Viga" }),
+            k.pos(pos.x, pos.y - 40),
+            k.color(color),
+            k.anchor("center"),
+            k.z(400),
+            k.outline(4, [0, 0, 0]),
+            k.move(270, 100),
+            {
+                update() {
+                    this.opacity = k.lerp(this.opacity, 0, k.dt() * 2);
+                    if (this.opacity <= 0.1) k.destroy(this);
+                }
+            }
+        ]);
+        n.opacity = 1;
     }
 
     function getTargetPos(target) {
@@ -407,7 +427,7 @@ export default function BattleScene() {
     function handleSkillSelection() {
         const hero = gameState.party[currentHeroIndex];
         const skill = hero.skills[selectedSkillIndex];
-        if (!skill || hero.sp < skill.spCost) return;
+        if (!skill || hero.mp < skill.mpCost) return;
 
         selectedAction = { type: "SKILL", skill, source: hero };
         if (skill.target === "ONE_ENEMY") startTargeting("SKILL", "ENEMIES");
@@ -474,42 +494,48 @@ export default function BattleScene() {
 
     async function executeTurn() {
         menuSystem.hide();
-        for (const action of playerActions) {
-            if (gameState.areEnemiesDefeated() || action.source.isDead) continue;
+
+        // Phase 1: Collect Enemy Actions
+        const allActions = [...playerActions];
+        for (const enemy of gameState.enemies) {
+            if (enemy.isDead) continue;
+            const enemyAction = await getEnemyAction(enemy);
+            if (enemyAction) allActions.push(enemyAction);
+        }
+
+        // Sort by speed
+        allActions.sort((a, b) => b.source.effectiveSpeed - a.source.effectiveSpeed);
+
+        // Phase 2: Execute
+        for (const action of allActions) {
+            if (gameState.areEnemiesDefeated() || gameState.isPartyDefeated()) break;
+            if (action.source.isDead) continue;
             await performAction(action);
             await k.wait(0.6);
         }
-        if (gameState.areEnemiesDefeated()) return endGame(true);
 
-        for (const enemy of gameState.enemies) {
-            if (enemy.isDead || gameState.isPartyDefeated()) continue;
-            await enemyTurn(enemy);
-            await k.wait(0.6);
-        }
-
-        if (gameState.isPartyDefeated()) endGame(false);
+        if (gameState.areEnemiesDefeated()) endGame(true);
+        else if (gameState.isPartyDefeated()) endGame(false);
         else startNewRound();
     }
 
-    async function enemyTurn(enemy) {
+    async function getEnemyAction(enemy) {
         const aliveHeroes = gameState.party.filter(h => !h.isDead);
-        if (aliveHeroes.length === 0) return; // Should not happen if game over check works
+        if (aliveHeroes.length === 0) return null;
 
         const roll = Math.random();
-        // Enemies only use skills on alive heroes or themselves/allies
-        if (roll < 0.2) await performAction({ type: "DEFEND", source: enemy, target: enemy });
-        else if (roll < 0.6 && enemy.sp >= 10) {
+        if (roll < 0.2) return { type: "DEFEND", source: enemy, target: enemy };
+        else if (roll < 0.6 && enemy.mp >= 10 && enemy.skills.length > 0) {
             const skill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
             const isHealSkill = skill.type === "Heal" || skill.type === "Buff";
             const targetGroup = isHealSkill ? gameState.enemies.filter(e => !e.isDead) : aliveHeroes;
 
             if (targetGroup.length > 0) {
                 const target = targetGroup[Math.floor(Math.random() * targetGroup.length)];
-                await performAction({ type: "SKILL", source: enemy, target, skill });
+                return { type: "SKILL", source: enemy, target, skill };
             }
-        } else {
-            await performAction({ type: "FIGHT", source: enemy, target: aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)] });
         }
+        return { type: "FIGHT", source: enemy, target: aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)] };
     }
 
     async function performAction(action) {
@@ -545,37 +571,60 @@ export default function BattleScene() {
         }
 
         const rarityTag = (type === "SKILL" && skill) ? skill.rarity : null;
-        const skillNameFormatted = rarityTag ? `[${rarityTag}]${skill.name}[/${rarityTag}]` : (type === "SKILL" ? skill.name : type);
+        const skillNameFormatted = rarityTag ? `[${rarityTag}]${skill.name}[/${rarityTag}]` : (type === "SKILL" && skill ? skill.name : type);
         log.updateLog(`${source.name} uses ${skillNameFormatted}!`, false);
         await k.wait(0.5);
 
         const targetPos = getTargetPos(target);
 
         if (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage")) {
+            const isSkill = type === "SKILL";
             const targets = (target === "ALL_ENEMIES") ? gameState.enemies.filter(e => !e.isDead) :
                 (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
 
-            targets.forEach(t => {
-                if (!t || t.isDead) return;
+            for (const t of targets) {
+                if (!t || t.isDead) continue;
                 showTargetHp(t);
-                const basePower = (type === "FIGHT" || !skill) ? source.attack : source.attack + skill.power;
-                t.takeDamage(basePower, (type === "SKILL" && skill) ? skill.attribute : source.attribute);
-            });
-            shakeScreen(5);
+
+                // Use Attack for Physical/Fight, SpecialAttack for Elemental Skills
+                const isPhysical = !isSkill || skill.attribute === ATTRIBUTES.PHYSICAL;
+                const srcStat = isPhysical ? source.effectiveAttack : source.effectiveSpecialAttack;
+                const basePower = isSkill ? srcStat + skill.power : srcStat;
+
+                const result = t.takeDamage(basePower, isSkill ? skill.attribute : source.attribute, source, isSkill);
+
+                if (!result.hit) {
+                    log.updateLog("MISS!", false, [200, 200, 200]);
+                    spawnParticles(getTargetPos(t), "X", [200, 200, 200]);
+                } else {
+                    if (result.crit) {
+                        log.updateLog("CRITICAL HIT!", false, COLORS.highlight);
+                        shakeScreen(15);
+                    }
+                    if (result.mult > 1) log.updateLog("It's super effective!", false, [255, 255, 100]);
+                    if (result.mult < 1) log.updateLog("It's not very effective...", false, [150, 150, 200]);
+
+                    const damageColor = isPhysical ? [255, 255, 255] : (ATTRIBUTE_COLORS[skill.attribute] || [255, 255, 255]);
+                    spawnNumbers(getTargetPos(t), result.damage, result.crit ? 50 : 32, damageColor);
+                    shakeScreen(result.crit ? 10 : 5);
+                }
+                await k.wait(0.3);
+            }
         } else if (type === "DEFEND") {
             source.defend();
-            spawnParticles(targetPos, "↑", [255, 255, 150]);
+            spawnParticles(targetPos, "🛡️", [255, 255, 150]);
         } else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
             const amount = skill ? skill.power : 50;
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
             targets.forEach(t => {
-                if (!t || t.isDead) return;
+                if (!t || (t.isDead && type !== "ITEM")) return; // Only items can revive for now or specific skills if added
                 t.heal(amount);
-                spawnParticles(getTargetPos(t), "+", [100, 255, 100]);
+                spawnNumbers(getTargetPos(t), amount, 32, [100, 255, 100]);
+                spawnParticles(getTargetPos(t), "✨", [100, 255, 100]);
             });
             if (skill) {
                 await k.wait(0.4);
-                log.updateLog(`${source.name} used ${skillNameFormatted}. ${target.name || "Party"} healed ${amount} HP!`, false);
+                log.updateLog(`${source.name} used ${skillNameFormatted}.`, false);
             }
         } else if (type === "SKILL" && (skill.type === "Buff" || skill.type === "Debuff")) {
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) :
@@ -589,6 +638,8 @@ export default function BattleScene() {
                 if (skill.effect.stat === "attack") color = [240, 80, 120];
                 if (skill.effect.stat === "defense") color = [255, 255, 150];
                 if (skill.effect.stat === "speed") color = [80, 240, 210];
+                if (skill.effect.stat === "specialAttack") color = [180, 80, 255];
+                if (skill.effect.stat === "specialDefense") color = [80, 150, 255];
             }
 
             targets.forEach(t => {
@@ -607,10 +658,10 @@ export default function BattleScene() {
             await k.wait(0.4);
             const change = isBuff ? "increased" : "decreased";
             const statName = skill.effect ? skill.effect.stat : "stats";
-            log.updateLog(`${source.name} used ${skillNameFormatted}. ${target.name || "Target"}'s ${statName} ${change}!`, false);
+            log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, false);
         }
 
-        if (type === "SKILL" && skill) source.costSp(skill.spCost);
+        if (type === "SKILL" && skill) source.costMp(skill.mpCost);
 
         await k.wait(0.4);
 
