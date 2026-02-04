@@ -73,7 +73,7 @@ const HERO_SKILLS = [
     createSkill("h_myth_1", "Omnislash", "Hero", "Damage", ATTRIBUTES.ALMIGHTY, 100, 40, TARGETS.ONE_ENEMY, "7 strikes of light.", RARITIES.MYTHICAL, { multi: 7 }, false, "Physical"),
 
     createSkill("p1", "Brave Heart", "Hero", "Passive", ATTRIBUTES.STAR, 0, 0, TARGETS.SELF, "Increases Attack by 10%.", RARITIES.RARE, { stat: "attack", amount: 1.1 }),
-    createSkill("p8", "Leader Aura", "Hero", "Passive", ATTRIBUTES.LIGHT, 0, 0, TARGETS.SELF, "Increases Sp.Defense by 10%.", RARITIES.RARE, { stat: "specialDefense", amount: 1.1 }),
+    createSkill("p8", "Leader Aura", "Hero", "Passive", ATTRIBUTES.LIGHT, 0, 0, TARGETS.SELF, "Increases Sp.Defense by 10%.", RARITIES.RARE, { stat: "spDefense", amount: 1.1 }),
 ];
 
 // --- TANK SKILLS ---
@@ -123,7 +123,7 @@ const MAGE_SKILLS = [
     createSkill("m_leg_1", "Grand Cross", "Mage", "Damage", ATTRIBUTES.LIGHT, 60, 110, TARGETS.ALL_ENEMIES, "Celestial judgment.", RARITIES.LEGENDARY, null, false, "Special"),
     createSkill("m_myth_1", "Big Bang", "Mage", "Damage", ATTRIBUTES.ALMIGHTY, 120, 200, TARGETS.ALL_ENEMIES, "Beginning of everything.", RARITIES.MYTHICAL, null, false, "Special"),
 
-    createSkill("p3", "Mana Flow", "Mage", "Passive", ATTRIBUTES.PSYCHIC, 0, 0, TARGETS.SELF, "Increases Sp.Attack by 10%.", RARITIES.RARE, { stat: "specialAttack", amount: 1.1 }),
+    createSkill("p3", "Mana Flow", "Mage", "Passive", ATTRIBUTES.PSYCHIC, 0, 0, TARGETS.SELF, "Increases Sp.Attack by 10%.", RARITIES.RARE, { stat: "spAttack", amount: 1.1 }),
     createSkill("p6", "Quick Cast", "Mage", "Passive", ATTRIBUTES.ELECTRIC, 0, 0, TARGETS.SELF, "Increases Speed by 10%.", RARITIES.RARE, { stat: "speed", amount: 1.1 }),
 ];
 

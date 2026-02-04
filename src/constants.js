@@ -99,6 +99,7 @@ export const GAMEPLAY = {
     ITEM_HEAL_MIN: 20,
     ITEM_HEAL_MAX: 50,
     MAX_ENEMIES: 3,
+    LEVEL_CAP: 99,
 };
 
 // New Layout Constants

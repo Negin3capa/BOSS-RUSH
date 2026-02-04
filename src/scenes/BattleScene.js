@@ -431,7 +431,7 @@ export default function BattleScene() {
     function handleSkillSelection() {
         const hero = gameState.party[currentHeroIndex];
         const skill = hero.skills[selectedSkillIndex];
-        if (!skill || hero.mp < skill.mpCost) return;
+        if (!skill || hero.juice < skill.mpCost) return;
 
         selectedAction = { type: "SKILL", skill, source: hero };
         if (skill.target === "ONE_ENEMY") startTargeting("SKILL", "ENEMIES");
@@ -535,7 +535,7 @@ export default function BattleScene() {
 
         const roll = Math.random();
         if (roll < 0.2) return { type: "DEFEND", source: enemy, target: enemy };
-        else if (roll < 0.6 && enemy.mp >= 10 && enemy.skills.length > 0) {
+        else if (roll < 0.6 && enemy.juice >= 10 && enemy.skills.length > 0) {
             const skill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
             const isHealSkill = skill.type === "Heal" || skill.type === "Buff";
             const targetGroup = isHealSkill ? gameState.enemies.filter(e => !e.isDead) : aliveHeroes;
@@ -605,7 +605,7 @@ export default function BattleScene() {
                 if (isSkill && skill && skill.isSpeedScaling) {
                     srcStat = source.effectiveSpeed;
                 } else {
-                    srcStat = (category === "Physical") ? source.effectiveAttack : source.effectiveSpecialAttack;
+                    srcStat = (category === "Physical") ? source.effectiveAttack : source.effectiveSpAttack;
                 }
                 const basePower = (srcStat * 0.5) + (isSkill ? skill.power : 15);
 
@@ -659,8 +659,8 @@ export default function BattleScene() {
                 if (skill.effect.stat === "attack") color = [240, 80, 120];
                 if (skill.effect.stat === "defense") color = [255, 255, 150];
                 if (skill.effect.stat === "speed") color = [80, 240, 210];
-                if (skill.effect.stat === "specialAttack") color = [180, 80, 255];
-                if (skill.effect.stat === "specialDefense") color = [80, 150, 255];
+                if (skill.effect.stat === "spAttack" || skill.effect.stat === "specialAttack") color = [180, 80, 255];
+                if (skill.effect.stat === "spDefense" || skill.effect.stat === "specialDefense") color = [80, 150, 255];
             }
 
             targets.forEach(t => {
@@ -682,7 +682,7 @@ export default function BattleScene() {
             log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, false);
         }
 
-        if (type === "SKILL" && skill) source.costMp(skill.mpCost);
+        if (type === "SKILL" && skill) source.costJuice(skill.mpCost);
 
         await k.wait(0.4);
 
@@ -708,9 +708,27 @@ export default function BattleScene() {
     function endGame(win) {
         turnPhase = "END";
 
-        // Increment scaling after a boss battle victory
-        if (win && gameState.roundCounter % 3 === 0) {
-            gameState.scalingFactor += 0.2;
+        // Handle EXP and Rewards
+        let expReward = 0;
+        if (win) {
+            // Base EXP = 50 per enemy + bonus for boss/round
+            const totalEnemyLevels = gameState.enemies.reduce((acc, e) => acc + e.level, 0);
+            expReward = Math.floor(totalEnemyLevels * 25 * gameState.scalingFactor);
+
+            // Give EXP to alive party members
+            gameState.party.forEach(hero => {
+                if (!hero.isDead) {
+                    const result = hero.gainExp(expReward);
+                    if (result.leveledUp) {
+                        log.updateLog(`${hero.name} leveled up to ${hero.level}!`, false, [255, 215, 0]);
+                    }
+                }
+            });
+
+            // Increment scaling after a boss battle victory
+            if (gameState.roundCounter % 3 === 0) {
+                gameState.scalingFactor += 0.2;
+            }
         }
 
         k.add([k.rect(SCREEN_WIDTH, SCREEN_HEIGHT), k.color(0, 0, 0), k.opacity(0.6), k.z(500)]);

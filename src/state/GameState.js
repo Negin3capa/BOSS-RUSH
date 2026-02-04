@@ -67,6 +67,13 @@ export class GameState {
         char.skills = char.activeSkills; // Compatibility for UI
     }
 
+    get averagePartyLevel() {
+        const aliveMembers = this.party.filter(p => !p.isDead);
+        if (aliveMembers.length === 0) return 1;
+        const sum = aliveMembers.reduce((acc, p) => acc + p.level, 0);
+        return sum / aliveMembers.length;
+    }
+
     generateEnemies() {
         this.enemies = [];
         const availableTypes = Object.values(ATTRIBUTES).filter(t => t !== ATTRIBUTES.PHYSICAL && t !== ATTRIBUTES.SPECIAL && t !== ATTRIBUTES.HEALING);
@@ -76,8 +83,6 @@ export class GameState {
         const type = isBossRound ? "Boss" : (isStrongerRound ? "Stronger" : "Simple");
         const count = isBossRound ? 1 : (isStrongerRound ? 2 : k.randi(1, GAMEPLAY.MAX_ENEMIES));
 
-        const luckFactor = Math.floor((roundNum - 1) / 3) * 0.5;
-
         for (let i = 0; i < count; i++) {
             const stats = this.getEnemyStats(type);
             const enemy = new BaseCharacter(
@@ -86,6 +91,8 @@ export class GameState {
                 stats
             );
             enemy.isBoss = isBossRound;
+            // Enemies gain levels too
+            enemy.level = Math.max(1, Math.floor(this.averagePartyLevel + (roundNum / 3)));
 
             // Assign 1 or 2 random types
             const t1 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
@@ -119,16 +126,19 @@ export class GameState {
             };
         }
 
+        // Combine round-based scaling and level-based scaling
+        const roundScaling = this.scalingFactor * (1 + (this.roundCounter - 1) * 0.05);
+
         return {
-            hp: Math.floor(base.hp * this.scalingFactor),
-            mp: Math.floor(base.mp * this.scalingFactor),
-            attack: Math.floor(base.attack * this.scalingFactor),
-            defense: Math.floor(base.defense * this.scalingFactor),
-            specialAttack: Math.floor(base.specialAttack * this.scalingFactor),
-            specialDefense: Math.floor(base.specialDefense * this.scalingFactor),
-            speed: Math.floor(base.speed * this.scalingFactor),
-            accuracy: Math.floor(base.accuracy * this.scalingFactor),
-            luck: Math.floor(base.luck * this.scalingFactor)
+            hp: Math.floor(base.hp * roundScaling),
+            mp: Math.floor(base.mp * roundScaling),
+            attack: Math.floor(base.attack * roundScaling),
+            defense: Math.floor(base.defense * roundScaling),
+            specialAttack: Math.floor(base.specialAttack * roundScaling),
+            specialDefense: Math.floor(base.specialDefense * roundScaling),
+            speed: Math.floor(base.speed * roundScaling),
+            accuracy: Math.floor(base.accuracy * roundScaling),
+            luck: Math.floor(base.luck * roundScaling)
         };
     }
 

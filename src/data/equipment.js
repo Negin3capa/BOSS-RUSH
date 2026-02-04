@@ -92,8 +92,8 @@ export const EQUIPMENT_DATA = [
     // Uncommon
     { id: "ac5", name: "Silver Band", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.UNCOMMON, attackBonus: 5, spAttackBonus: 5, description: "Better quality." },
     { id: "ac6", name: "Garnet Amulet", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.UNCOMMON, hpBonus: 25, description: "Hearty red stone." },
-    { id: "ac7", name: "Sharp Eye Lens", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.UNCOMMON, accuracyBonus: 10, description: "Focuses sight." },
-    { id: "ac8", name: "Mana Crystal", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.UNCOMMON, mpBonus: 20, description: "Stores energy." },
+    { id: "ac7", name: "Sharp Eye Lens", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.UNCOMMON, hitRateBonus: 10, description: "Focuses sight." },
+    { id: "ac8", name: "Mana Crystal", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.UNCOMMON, juiceBonus: 20, description: "Stores energy." },
 
     // Rare
     { id: "ac9", name: "Brave Ring", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.RARE, grantedPassive: "p1", description: "Grants Brave Heart." },
@@ -109,13 +109,13 @@ export const EQUIPMENT_DATA = [
 
     // Legendary
     { id: "ac17", name: "Hero's Emblem", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.LEGENDARY, allStatsBonus: 15, description: "Mark of a true hero." },
-    { id: "ac18", name: "God's Finger", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.LEGENDARY, attackBonus: 50, accuracyBonus: 50, description: "Divine precision." },
+    { id: "ac18", name: "God's Finger", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.LEGENDARY, attackBonus: 50, hitRateBonus: 50, description: "Divine precision." },
     { id: "ac19", name: "Eye of Odin", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.LEGENDARY, spAttackBonus: 50, grantedPassive: "p8", description: "All-seeing magic." },
     { id: "ac20", name: "Ring of Command", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.LEGENDARY, grantedPassive: "p4", speedBonus: 30, description: "Leaders' speed." },
 
     // Mythical
     { id: "ac21", name: "Omega Ring", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.MYTHICAL, allStatsBonus: 50, description: "The beginning and end." },
-    { id: "ac22", name: "Star Heart", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.MYTHICAL, hpBonus: 500, mpBonus: 500, description: "Core of a galaxy." },
+    { id: "ac22", name: "Star Heart", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.MYTHICAL, hpBonus: 500, juiceBonus: 500, description: "Core of a galaxy." },
     { id: "ac23", name: "Chaos Orb", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.MYTHICAL, grantedPassive: "h6_3", description: "Unpredictable power." },
     { id: "ac24", name: "Aurelian Soul", type: EQUIPMENT_TYPES.ACCESSORY, rarity: RARITIES.MYTHICAL, allStatsBonus: 100, description: "Eternal essence." },
 ];

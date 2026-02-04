@@ -57,6 +57,19 @@ export function createBattleUI(gameState) {
             k.color(COLORS.uiBackground),
         ]);
 
+        // Level Display
+        container.add([
+            k.text(`LV: ${char.level}`, { size: 14, font: "Viga" }),
+            k.pos(190, 10),
+            k.anchor("right"),
+            k.color(COLORS.text),
+            {
+                update() {
+                    this.text = `LV: ${char.level}`;
+                }
+            }
+        ]);
+
         // HP Bar
         const hpY = 32;
         const barX = 10;
@@ -100,42 +113,42 @@ export function createBattleUI(gameState) {
             }
         ]);
 
-        // MP Bar
-        const mpY = 74;
+        // Juice Bar (Renamed from MP)
+        const juiceY = 74;
 
         container.add([
             k.sprite("droplet"),
-            k.pos(barX + 10, mpY + 7.5),
+            k.pos(barX + 10, juiceY + 7.5),
             k.anchor("center"),
             k.scale(0.025),
         ]);
 
         container.add([
             k.rect(barWidth, LAYOUT.BAR_HEIGHT),
-            k.pos(barX + 25, mpY),
+            k.pos(barX + 25, juiceY),
             k.color(COLORS.uiBorder),
         ]);
 
-        const mpFill = container.add([
+        const juiceFill = container.add([
             k.rect(barWidth - 4, LAYOUT.BAR_HEIGHT - 4),
-            k.pos(barX + 27, mpY + 2),
+            k.pos(barX + 27, juiceY + 2),
             k.color(COLORS.mp),
             {
                 update() {
-                    const targetWidth = (char.mp / char.maxMp) * (barWidth - 4);
+                    const targetWidth = (char.juice / char.maxJuice) * (barWidth - 4);
                     this.width = k.lerp(this.width, Math.max(0, targetWidth), k.dt() * 10);
                 }
             }
         ]);
 
-        const mpText = container.add([
-            k.text(`${Math.floor(char.mp)}/${char.maxMp}`, { size: 12, font: "Inter" }),
-            k.pos(barX + 25, mpY + 16),
+        const juiceText = container.add([
+            k.text(`${Math.floor(char.juice)}/${char.maxJuice}`, { size: 12, font: "Inter" }),
+            k.pos(barX + 25, juiceY + 16),
             k.color(COLORS.text),
             {
                 update() {
-                    const currentMp = Math.max(0, Math.floor(char.mp));
-                    this.text = `${currentMp}/${char.maxMp}`;
+                    const currentJuice = Math.max(0, Math.floor(char.juice));
+                    this.text = `${currentJuice}/${char.maxJuice}`;
                 }
             }
         ]);
@@ -414,7 +427,7 @@ export function createMenuSystem() {
 
             const selectedSkill = skills[selectedIndex];
             if (selectedSkill) {
-                infoText.text = `${selectedSkill.name.toUpperCase()} [[${selectedSkill.rarity}]${selectedSkill.rarity}[/${selectedSkill.rarity}]]\n(${selectedSkill.mpCost} MP) ${selectedSkill.description}`;
+                infoText.text = `${selectedSkill.name.toUpperCase()} [[${selectedSkill.rarity}]${selectedSkill.rarity}[/${selectedSkill.rarity}]]\n(${selectedSkill.mpCost} JUICE) ${selectedSkill.description}`;
                 infoText.color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]); // Default text color
             }
         },

@@ -20,36 +20,46 @@ export class BaseCharacter {
         // Types (Support for dual-typing)
         this.types = [ATTRIBUTES.NORMAL];
 
-        // Stats
-        this.baseMaxHp = this.randomizeStat(baseStats.hp);
-        this.baseMaxMp = this.randomizeStat(baseStats.mp);
+        // Stats - New Naming Convention
+        this.level = 1;
+        this.exp = 0;
 
-        this.baseAttack = this.randomizeStat(baseStats.attack);
-        this.baseDefense = this.randomizeStat(baseStats.defense);
-        this.baseSpecialAttack = this.randomizeStat(baseStats.specialAttack || 10);
-        this.baseSpecialDefense = this.randomizeStat(baseStats.specialDefense || 10);
-        this.baseSpeed = this.randomizeStat(baseStats.speed || 10);
-        this.baseAccuracy = this.randomizeStat(baseStats.accuracy || 100);
-        this.baseLuck = this.randomizeStat(baseStats.luck || 5);
+        // Base values are at Level 1
+        this.rawHp = this.randomizeStat(baseStats.hp);
+        this.rawJuice = this.randomizeStat(baseStats.mp); // Renamed from mp to juice
+        this.rawAttack = this.randomizeStat(baseStats.attack);
+        this.rawDefense = this.randomizeStat(baseStats.defense);
+        this.rawSpAttack = this.randomizeStat(baseStats.specialAttack || 10);
+        this.rawSpDefense = this.randomizeStat(baseStats.specialDefense || 10);
+        this.rawSpeed = this.randomizeStat(baseStats.speed || 10);
+        this.rawHitRate = this.randomizeStat(baseStats.accuracy || 100);
+        this.rawLuck = this.randomizeStat(baseStats.luck || 5);
 
         this.hp = this.maxHp;
-        this.mp = this.maxMp;
+        this.juice = this.maxJuice;
 
         this.isDead = false;
         this.isDefending = false;
         this.statusEffects = []; // { stat: 'attack'|'defense'|..., amount: 1.5, duration: 3, type: 'BUFF'|'DEBUFF' }
     }
 
+    // Level-based Stat Calculation
+    getStatAtLevel(baseStat, allowScaling = true) {
+        if (!allowScaling) return baseStat;
+        // stat = baseStat * (1 + (level - 1) * 0.1)
+        return Math.floor(baseStat * (1 + (this.level - 1) * 0.1));
+    }
+
     get maxHp() {
         let bonus = 0;
         Object.values(this.equipment).forEach(eq => { if (eq && eq.hpBonus) bonus += eq.hpBonus; });
-        return this.baseMaxHp + bonus;
+        return this.getStatAtLevel(this.rawHp) + bonus;
     }
 
-    get maxMp() {
+    get maxJuice() {
         let bonus = 0;
-        Object.values(this.equipment).forEach(eq => { if (eq && eq.mpBonus) bonus += eq.mpBonus; });
-        return this.baseMaxMp + bonus;
+        Object.values(this.equipment).forEach(eq => { if (eq && eq.juiceBonus || eq && eq.mpBonus) bonus += (eq.juiceBonus || eq.mpBonus); });
+        return this.getStatAtLevel(this.rawJuice) + bonus;
     }
 
     get attack() {
@@ -58,7 +68,7 @@ export class BaseCharacter {
             if (eq && eq.attackBonus) bonus += eq.attackBonus;
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseAttack + bonus;
+        return this.getStatAtLevel(this.rawAttack) + bonus;
     }
 
     get defense() {
@@ -67,25 +77,25 @@ export class BaseCharacter {
             if (eq && eq.defBonus) bonus += eq.defBonus;
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseDefense + bonus;
+        return this.getStatAtLevel(this.rawDefense) + bonus;
     }
 
-    get specialAttack() {
+    get spAttack() {
         let bonus = 0;
         Object.values(this.equipment).forEach(eq => {
-            if (eq && eq.spAttackBonus) bonus += eq.spAttackBonus;
+            if (eq && (eq.spAttackBonus || eq.specialAttackBonus)) bonus += (eq.spAttackBonus || eq.specialAttackBonus);
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseSpecialAttack + bonus;
+        return this.getStatAtLevel(this.rawSpAttack) + bonus;
     }
 
-    get specialDefense() {
+    get spDefense() {
         let bonus = 0;
         Object.values(this.equipment).forEach(eq => {
-            if (eq && eq.spDefBonus) bonus += eq.spDefBonus;
+            if (eq && (eq.spDefBonus || eq.specialDefenseBonus)) bonus += (eq.spDefBonus || eq.specialDefenseBonus);
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseSpecialDefense + bonus;
+        return this.getStatAtLevel(this.rawSpDefense) + bonus;
     }
 
     get speed() {
@@ -94,16 +104,16 @@ export class BaseCharacter {
             if (eq && eq.speedBonus) bonus += eq.speedBonus;
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseSpeed + bonus;
+        return this.getStatAtLevel(this.rawSpeed) + bonus;
     }
 
-    get accuracy() {
+    get hitRate() {
         let bonus = 0;
         Object.values(this.equipment).forEach(eq => {
-            if (eq && eq.accuracyBonus) bonus += eq.accuracyBonus;
+            if (eq && (eq.hitRateBonus || eq.accuracyBonus)) bonus += (eq.hitRateBonus || eq.accuracyBonus);
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseAccuracy + bonus;
+        return this.getStatAtLevel(this.rawHitRate) + bonus;
     }
 
     get luck() {
@@ -112,21 +122,28 @@ export class BaseCharacter {
             if (eq && eq.luckBonus) bonus += eq.luckBonus;
             if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
         });
-        return this.baseLuck + bonus;
+        // Luck doesn't scale with level as per request
+        return this.rawLuck + bonus;
     }
 
     get effectiveAttack() { return this.getEffectiveStat("attack"); }
     get effectiveDefense() { return this.getEffectiveStat("defense"); }
-    get effectiveSpecialAttack() { return this.getEffectiveStat("specialAttack"); }
-    get effectiveSpecialDefense() { return this.getEffectiveStat("specialDefense"); }
+    get effectiveSpAttack() { return this.getEffectiveStat("spAttack"); }
+    get effectiveSpDefense() { return this.getEffectiveStat("spDefense"); }
     get effectiveSpeed() { return this.getEffectiveStat("speed"); }
-    get effectiveAccuracy() { return this.getEffectiveStat("accuracy"); }
+    get effectiveHitRate() { return this.getEffectiveStat("hitRate"); }
     get effectiveLuck() { return this.getEffectiveStat("luck"); }
 
     getEffectiveStat(statName) {
         let multiplier = 1.0;
         this.statusEffects.forEach(effect => {
-            if (effect.stat === statName) multiplier *= effect.amount;
+            if (effect.stat === statName ||
+                effect.stat === "all" ||
+                (effect.stat === "allDefense" && (statName === "defense" || statName === "spDefense")) ||
+                (statName === "spAttack" && effect.stat === "specialAttack") ||
+                (statName === "spDefense" && effect.stat === "specialDefense")) {
+                multiplier *= effect.amount;
+            }
         });
         const base = this[statName];
         return Math.floor(base * multiplier);
@@ -169,10 +186,10 @@ export class BaseCharacter {
             actualSkillType = attacker.equipment.weapon.attribute;
         }
 
-        // 2. Hit/Dodge Logic
+        // 2. Hit/Dodge Logic - Updated: attacker's hitRate determines hit chance
         let hitChance = 100;
         if (attacker) {
-            hitChance = 90 + (attacker.effectiveAccuracy * 0.1) - (this.effectiveSpeed * 0.1);
+            hitChance = attacker.effectiveHitRate;
         }
         hitChance = Math.min(100, Math.max(5, hitChance));
 
@@ -180,10 +197,10 @@ export class BaseCharacter {
             return { damage: 0, mult: 1, hit: false, crit: false };
         }
 
-        // 3. Critical Hit Logic (Physical Only)
+        // 3. Critical Hit Logic - Updated: 1 luck point = 1%
         let isCrit = false;
         if (category === "Physical") {
-            const critChance = (attacker ? attacker.effectiveLuck : 0) * 0.5 + (attacker ? attacker.effectiveAccuracy : 0) * 0.1;
+            const critChance = (attacker ? attacker.effectiveLuck : 0);
             if (Math.random() * 100 < critChance) {
                 isCrit = true;
             }
@@ -209,7 +226,7 @@ export class BaseCharacter {
             defValue = this.effectiveDefense;
             if (isCrit) defValue *= 0.5;
         } else {
-            defValue = this.effectiveSpecialDefense;
+            defValue = this.effectiveSpDefense;
         }
 
         let actualDamage = (amount * typeMultiplier) - (defValue / 2);
@@ -236,14 +253,14 @@ export class BaseCharacter {
         }
     }
 
-    restoreMp(amount) {
+    restoreJuice(amount) {
         if (this.isDead) return;
-        this.mp = Math.min(this.maxMp, Math.floor(this.mp + amount));
+        this.juice = Math.min(this.maxJuice, Math.floor(this.juice + amount));
     }
 
-    costMp(amount) {
-        if (this.mp >= amount) {
-            this.mp -= amount;
+    costJuice(amount) {
+        if (this.juice >= amount) {
+            this.juice -= amount;
             return true;
         }
         return false;
@@ -251,13 +268,40 @@ export class BaseCharacter {
 
     defend() {
         this.isDefending = true;
-        // Regenerate 20% + 5 of total MP
-        const regenAmount = (this.maxMp * 0.2) + 5;
-        this.restoreMp(regenAmount);
+        // Regenerate 20% + 5 of total Juice
+        const regenAmount = (this.maxJuice * 0.2) + 5;
+        this.restoreJuice(regenAmount);
     }
 
     resetTurn() {
         this.isDefending = false;
         this.tickStatusEffects();
+    }
+
+    // EXP and Leveling Logic
+    gainExp(amount) {
+        if (this.isDead || this.level >= 99) return { leveledUp: false, expGained: 0 };
+
+        this.exp += amount;
+        let leveledUp = false;
+        const previousLevel = this.level;
+
+        while (this.exp >= this.expToNextLevel && this.level < 99) {
+            this.exp -= this.expToNextLevel;
+            this.level++;
+            leveledUp = true;
+        }
+
+        if (leveledUp) {
+            // Fully heal on level up? Usually a nice touch.
+            this.hp = this.maxHp;
+            this.juice = this.maxJuice;
+        }
+
+        return { leveledUp, previousLevel, currentLevel: this.level, expGained: amount };
+    }
+
+    get expToNextLevel() {
+        return this.level * 100;
     }
 }
