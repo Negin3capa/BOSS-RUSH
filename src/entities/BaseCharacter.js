@@ -4,29 +4,115 @@ export class BaseCharacter {
     constructor(name, className, baseStats) {
         this.name = name;
         this.className = className;
-        this.skills = []; // Assigned later via GameState
 
-        // Specific attributes
-        this.attribute = ATTRIBUTES.PHYSICAL;
+        // Active and Passive Skills
+        this.activeSkills = [];
+        this.passiveSkills = [];
+        this.skills = []; // Compatibility
+
+        // Equipment
+        this.equipment = {
+            weapon: null,
+            armor: null,
+            accessory: null
+        };
+
+        // Types (Support for dual-typing)
+        this.types = [ATTRIBUTES.NORMAL];
 
         // Stats
-        this.maxHp = this.randomizeStat(baseStats.hp);
+        this.baseMaxHp = this.randomizeStat(baseStats.hp);
+        this.baseMaxMp = this.randomizeStat(baseStats.mp);
+
+        this.baseAttack = this.randomizeStat(baseStats.attack);
+        this.baseDefense = this.randomizeStat(baseStats.defense);
+        this.baseSpecialAttack = this.randomizeStat(baseStats.specialAttack || 10);
+        this.baseSpecialDefense = this.randomizeStat(baseStats.specialDefense || 10);
+        this.baseSpeed = this.randomizeStat(baseStats.speed || 10);
+        this.baseAccuracy = this.randomizeStat(baseStats.accuracy || 100);
+        this.baseLuck = this.randomizeStat(baseStats.luck || 5);
+
         this.hp = this.maxHp;
-
-        this.maxMp = this.randomizeStat(baseStats.mp);
         this.mp = this.maxMp;
-
-        this.attack = this.randomizeStat(baseStats.attack);
-        this.defense = this.randomizeStat(baseStats.defense);
-        this.specialAttack = this.randomizeStat(baseStats.specialAttack || 10);
-        this.specialDefense = this.randomizeStat(baseStats.specialDefense || 10);
-        this.speed = this.randomizeStat(baseStats.speed || 10);
-        this.accuracy = this.randomizeStat(baseStats.accuracy || 100);
-        this.luck = this.randomizeStat(baseStats.luck || 5);
 
         this.isDead = false;
         this.isDefending = false;
         this.statusEffects = []; // { stat: 'attack'|'defense'|..., amount: 1.5, duration: 3, type: 'BUFF'|'DEBUFF' }
+    }
+
+    get maxHp() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => { if (eq && eq.hpBonus) bonus += eq.hpBonus; });
+        return this.baseMaxHp + bonus;
+    }
+
+    get maxMp() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => { if (eq && eq.mpBonus) bonus += eq.mpBonus; });
+        return this.baseMaxMp + bonus;
+    }
+
+    get attack() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.attackBonus) bonus += eq.attackBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseAttack + bonus;
+    }
+
+    get defense() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.defBonus) bonus += eq.defBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseDefense + bonus;
+    }
+
+    get specialAttack() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.spAttackBonus) bonus += eq.spAttackBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseSpecialAttack + bonus;
+    }
+
+    get specialDefense() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.spDefBonus) bonus += eq.spDefBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseSpecialDefense + bonus;
+    }
+
+    get speed() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.speedBonus) bonus += eq.speedBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseSpeed + bonus;
+    }
+
+    get accuracy() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.accuracyBonus) bonus += eq.accuracyBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseAccuracy + bonus;
+    }
+
+    get luck() {
+        let bonus = 0;
+        Object.values(this.equipment).forEach(eq => {
+            if (eq && eq.luckBonus) bonus += eq.luckBonus;
+            if (eq && eq.allStatsBonus) bonus += eq.allStatsBonus;
+        });
+        return this.baseLuck + bonus;
     }
 
     get effectiveAttack() { return this.getEffectiveStat("attack"); }
@@ -74,14 +160,18 @@ export class BaseCharacter {
         this.statusEffects = this.statusEffects.filter(e => e.duration > 0);
     }
 
-    takeDamage(amount, attackAttribute = ATTRIBUTES.PHYSICAL, attacker = null, isSkill = false) {
+    takeDamage(amount, skillType = ATTRIBUTES.PHYSICAL, attacker = null, isSkill = false, category = "Physical") {
         if (this.isDead) return { damage: 0, mult: 1, hit: false, crit: false };
 
-        // 1. Hit/Dodge Logic
+        // 1. Determine Attack Type (Weapon priority for basic attacks)
+        let actualSkillType = skillType;
+        if (!isSkill && attacker && attacker.equipment.weapon) {
+            actualSkillType = attacker.equipment.weapon.attribute;
+        }
+
+        // 2. Hit/Dodge Logic
         let hitChance = 100;
         if (attacker) {
-            // Accuracy boosts hit, Speed boosts dodge
-            // Base formula: 90 + (Acc * 0.1) - (EnemySpeed * 0.1)
             hitChance = 90 + (attacker.effectiveAccuracy * 0.1) - (this.effectiveSpeed * 0.1);
         }
         hitChance = Math.min(100, Math.max(5, hitChance));
@@ -90,34 +180,39 @@ export class BaseCharacter {
             return { damage: 0, mult: 1, hit: false, crit: false };
         }
 
-        // 2. Critical Hit Logic (Physical Only)
+        // 3. Critical Hit Logic (Physical Only)
         let isCrit = false;
-        if (!isSkill || attackAttribute === ATTRIBUTES.PHYSICAL) {
+        if (category === "Physical") {
             const critChance = (attacker ? attacker.effectiveLuck : 0) * 0.5 + (attacker ? attacker.effectiveAccuracy : 0) * 0.1;
             if (Math.random() * 100 < critChance) {
                 isCrit = true;
             }
         }
 
-        // 3. Multiplier Logic (Elemental Skills Only)
-        let multiplier = 1.0;
-        if (isSkill && attackAttribute !== ATTRIBUTES.PHYSICAL) {
-            if (ELEMENTAL_CHART[attackAttribute] && ELEMENTAL_CHART[attackAttribute][this.attribute]) {
-                multiplier = ELEMENTAL_CHART[attackAttribute][this.attribute];
+        // 4. Multiplier Logic (Type Effectiveness & STAB)
+        let typeMultiplier = 1.0;
+        // Check effectiveness against each of the target's types (Always check now)
+        this.types.forEach(targetType => {
+            if (ELEMENTAL_CHART[actualSkillType] && ELEMENTAL_CHART[actualSkillType][targetType] !== undefined) {
+                typeMultiplier *= ELEMENTAL_CHART[actualSkillType][targetType];
             }
+        });
+
+        // STAB (Same Type Attack Bonus)
+        if (attacker && attacker.types.includes(actualSkillType)) {
+            typeMultiplier *= GAMEPLAY.STAB_BONUS;
         }
 
-        // 4. Defense Logic
-        // Physical attacks use defense, crits ignore 50%. Elemental use specialDefense.
+        // 5. Defense Logic
         let defValue = 0;
-        if (!isSkill || attackAttribute === ATTRIBUTES.PHYSICAL) {
+        if (category === "Physical") {
             defValue = this.effectiveDefense;
             if (isCrit) defValue *= 0.5;
         } else {
             defValue = this.effectiveSpecialDefense;
         }
 
-        let actualDamage = (amount * multiplier) - (defValue / 2);
+        let actualDamage = (amount * typeMultiplier) - (defValue / 2);
         if (this.isDefending) {
             actualDamage *= GAMEPLAY.DEFEND_DAMAGE_REDUCTION;
         }
@@ -126,15 +221,15 @@ export class BaseCharacter {
 
         this.hp -= actualDamage;
         if (this.hp <= 0) {
+            this.hp = 0;
             this.isDead = true;
             this.statusEffects = [];
         }
 
-        return { damage: actualDamage, mult: multiplier, hit: true, crit: isCrit };
+        return { damage: actualDamage, mult: typeMultiplier, hit: true, crit: isCrit };
     }
 
     heal(amount) {
-        // Heal can now target dead members
         this.hp = Math.min(this.maxHp, this.hp + amount);
         if (this.isDead && this.hp > 0) {
             this.isDead = false;
@@ -143,7 +238,7 @@ export class BaseCharacter {
 
     restoreMp(amount) {
         if (this.isDead) return;
-        this.mp = Math.min(this.maxMp, this.mp + amount);
+        this.mp = Math.min(this.maxMp, Math.floor(this.mp + amount));
     }
 
     costMp(amount) {
@@ -156,7 +251,9 @@ export class BaseCharacter {
 
     defend() {
         this.isDefending = true;
-        this.restoreMp(GAMEPLAY.DEFEND_MP_REGEN);
+        // Regenerate 20% + 5 of total MP
+        const regenAmount = (this.maxMp * 0.2) + 5;
+        this.restoreMp(regenAmount);
     }
 
     resetTurn() {

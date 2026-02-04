@@ -596,18 +596,20 @@ export default function BattleScene() {
                 if (!t || t.isDead) continue;
                 showTargetHp(t);
 
-                // Use Attack for Physical/Fight, SpecialAttack for Elemental Skills
-                // Special case: Speed-Scaling skills use Speed instead of Attack
-                const isPhysical = !isSkill || (skill && skill.attribute === ATTRIBUTES.PHYSICAL);
+                // Use Attack for Physical, SpecialAttack for Special Skills
+                // Special case: Speed-Scaling skills use Speed
+                const category = isSkill ? (skill.category || "Physical") : "Physical";
+                const skillType = isSkill ? skill.attribute : source.types[0];
+
                 let srcStat = 0;
                 if (isSkill && skill && skill.isSpeedScaling) {
                     srcStat = source.effectiveSpeed;
                 } else {
-                    srcStat = isPhysical ? source.effectiveAttack : source.effectiveSpecialAttack;
+                    srcStat = (category === "Physical") ? source.effectiveAttack : source.effectiveSpecialAttack;
                 }
                 const basePower = (srcStat * 0.5) + (isSkill ? skill.power : 15);
 
-                const result = t.takeDamage(basePower, isSkill ? skill.attribute : source.attribute, source, isSkill);
+                const result = t.takeDamage(basePower, skillType, source, isSkill, category);
 
                 if (!result.hit) {
                     log.updateLog("MISS!", false, [200, 200, 200]);
@@ -617,10 +619,13 @@ export default function BattleScene() {
                         log.updateLog("CRITICAL HIT!", false, COLORS.highlight);
                         shakeScreen(15);
                     }
-                    if (result.mult > 1) log.updateLog("It's super effective!", false, [255, 255, 100]);
-                    if (result.mult < 1) log.updateLog("It's not very effective...", false, [150, 150, 200]);
+                    if (result.mult > 1.5) log.updateLog("It's super effective!", false, [255, 255, 100]);
+                    else if (result.mult > 1 && isSkill && source.types.includes(skillType)) log.updateLog("STAB Bonus!", false, [100, 255, 255]);
 
-                    const damageColor = isPhysical ? [255, 255, 255] : (ATTRIBUTE_COLORS[skill.attribute] || [255, 255, 255]);
+                    if (result.mult < 1 && result.mult > 0) log.updateLog("It's not very effective...", false, [150, 150, 200]);
+                    if (result.mult === 0) log.updateLog("It had no effect...", false, [100, 100, 100]);
+
+                    const damageColor = (category === "Physical") ? [255, 255, 255] : (ATTRIBUTE_COLORS[skillType] || [255, 255, 255]);
                     spawnNumbers(getTargetPos(t), result.damage, result.crit ? 50 : 32, damageColor);
                     shakeScreen(result.crit ? 10 : 5);
                 }
