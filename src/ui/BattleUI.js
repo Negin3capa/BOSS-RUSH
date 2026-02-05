@@ -20,42 +20,64 @@ export function createBattleUI(gameState) {
 
         // Selection Border (Red)
         const selectionBorder = container.add([
-            k.rect(210, 120),
-            k.pos(-5, -5),
+            k.rect(210, 320),
+            k.pos(-5, -205),
             k.color(COLORS.hp),
             k.z(-1),
         ]);
         selectionBorder.hidden = true;
 
-        // Window Background (White)
+        // Character Panel Layout
+        // Portrait Box (200x200) + Stats Box (200x110)
+
+        // Portrait Box
+        const portraitBox = container.add([
+            k.rect(200, 200),
+            k.pos(0, -200), // Sits above stats box
+            k.color(COLORS.uiBackground),
+            k.outline(UI.OUTLINE, COLORS.uiBorder),
+        ]);
+
+        // Portrait Sprite
+        portraitBox.add([
+            k.sprite(`${char.name}Sprite`),
+            k.anchor("center"),
+            k.pos(100, 100),
+            k.scale(0.34), // Fit inside 200x200
+        ]);
+
+        // Header Label (e.g., NEUTRAL)
+        portraitBox.add([
+            k.rect(133, 30),
+            k.pos(98, 5), // Lowered slightly
+            k.anchor("center"),
+            k.color(COLORS.uiBorder),
+            k.outline(2, COLORS.uiBackground),
+        ]);
+
+        portraitBox.add([
+            k.text("NEUTRAL", { size: 16, font: "Viga" }),
+            k.pos(100, 5), // Lowered slightly
+            k.anchor("center"),
+            k.color(COLORS.uiBackground),
+        ]);
+
+        // Window Background (White) - Stats Box
         const mainBox = container.add([
             k.rect(200, 110),
             k.color(COLORS.uiBackground),
             k.outline(UI.OUTLINE, COLORS.uiBorder),
         ]);
 
-        // Fallen Overlay (Grey semi-transparent)
+        // Fallen Overlay (Fixed reference here as well)
         const fallenOverlay = container.add([
-            k.rect(200, 110),
+            k.rect(200, 310), // Covers both portrait and stats
+            k.pos(0, -200),
             k.color(100, 100, 120),
             k.opacity(0.5),
             k.z(10),
         ]);
         fallenOverlay.hidden = true;
-
-        // Name Tag Box
-        container.add([
-            k.rect(180, 25),
-            k.pos(10, -15),
-            k.color(COLORS.uiBorder),
-        ]);
-
-        container.add([
-            k.text(char.name.toUpperCase(), { size: 18, font: "Viga" }),
-            k.pos(100, -2),
-            k.anchor("center"),
-            k.color(COLORS.uiBackground),
-        ]);
 
         // Level Display
         container.add([
@@ -188,22 +210,27 @@ export function createBattleUI(gameState) {
         ]);
         shieldIcon.hidden = true;
 
+
+
         // Auto-update visuals based on character state
         container.onUpdate(() => {
             shieldIcon.hidden = !char.isDefending || char.isDead;
             fallenOverlay.hidden = !char.isDead;
             if (char.isDead) {
-                mainBox.color = k.rgb(150, 150, 160); // Dim the background
+                // mainBox.color = k.rgb(150, 150, 160); // Optional: dim individual boxes
             } else {
-                mainBox.color = k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
+                // mainBox.color = k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
             }
         });
 
         portraitUIs.push({ selectionBorder });
     });
 
+    const sidePanel = createSidePanel(gameState);
+
     return {
         ui: uiContainer,
+        sidePanel,
         updateSelection(selection) {
             portraitUIs.forEach((p, i) => {
                 let isSelected = false;
@@ -231,8 +258,8 @@ const GET_TEXT_STYLES = () => {
 
 export function createMessageLog() {
     const frame = k.add([
-        k.rect(SCREEN_WIDTH - 400, 80),
-        k.pos(SCREEN_WIDTH / 2, 20),
+        k.rect(500, 100), // Same size as Action Box
+        k.pos(LAYOUT.CENTER_X, 20),
         k.color(COLORS.uiBackground),
         k.outline(UI.OUTLINE, COLORS.uiBorder),
         k.anchor("top"),
@@ -242,19 +269,21 @@ export function createMessageLog() {
 
     const logText = k.add([
         k.text("What will you do?", {
-            size: 28,
+            size: 24, // Smaller to account for more text/frame constraints
+            width: 460,
             font: "Viga",
             styles: GET_TEXT_STYLES()
         }),
-        k.pos(SCREEN_WIDTH / 2, 60),
+        k.pos(LAYOUT.CENTER_X, 70),
         k.anchor("center"),
         k.color(COLORS.text),
         k.fixed(),
         k.z(101),
         k.scale(1),
         {
-            updateLog(msg, noPunch = false) {
+            updateLog(msg, noPunch = false, color = COLORS.text) {
                 this.text = msg;
+                this.color = k.rgb(color[0], color[1], color[2]);
                 if (!noPunch) {
                     this.scale = k.vec2(UI.PUNCH_SCALE);
                 }
@@ -326,15 +355,15 @@ export function createRoundCounter(gameState) {
 
 export function createMenuSystem() {
     const menuContainer = k.add([
-        k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60),
+        k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT - 70),
         k.anchor("center"),
         k.z(200),
         k.fixed(),
     ]);
 
     const infoBox = k.add([
-        k.rect(500, 80),
-        k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 170),
+        k.rect(500, 100),
+        k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT - 170),
         k.anchor("center"),
         k.color(COLORS.uiBackground),
         k.outline(UI.OUTLINE, COLORS.uiBorder),
@@ -437,6 +466,179 @@ export function createMenuSystem() {
         },
         show() {
             menuContainer.hidden = false;
+        }
+    };
+}
+
+export function createSidePanel(gameState) {
+    const container = k.add([
+        k.pos(0, 0),
+        k.fixed(),
+        k.z(80),
+    ]);
+
+    // Background
+    container.add([
+        k.rect(320, SCREEN_HEIGHT),
+        k.color(40, 40, 50),
+        k.outline(UI.OUTLINE, COLORS.uiBorder),
+    ]);
+
+    // Enemy Name Header Area
+    container.add([
+        k.rect(280, 50),
+        k.pos(20, 20),
+        k.color(200, 150, 50), // Gold-ish
+        k.outline(4, COLORS.uiBorder),
+    ]);
+
+    const enemyNameText = container.add([
+        k.text("ENEMY NAME HERE", { size: 20, font: "Viga" }),
+        k.pos(160, 45),
+        k.anchor("center"),
+        k.color(COLORS.uiBackground),
+    ]);
+
+    // Scoring Section
+    const scoreBox = container.add([
+        k.rect(280, 140),
+        k.pos(20, 90),
+        k.color(60, 60, 70),
+        k.outline(3, COLORS.uiBorder),
+    ]);
+
+    scoreBox.add([
+        k.text("Score at least", { size: 14, font: "Viga" }),
+        k.pos(140, 20),
+        k.anchor("center"),
+        k.color(200, 200, 200),
+    ]);
+
+    const targetScoreText = scoreBox.add([
+        k.text("", { size: 40, font: "Viga" }),
+        k.pos(140, 60),
+        k.anchor("center"),
+        k.color(240, 80, 80), // Reddish
+        {
+            update() {
+                this.text = `${gameState.scoringState.targetScore.toLocaleString()}`;
+            }
+        }
+    ]);
+
+    scoreBox.add([
+        k.text("to earn $$$$", { size: 14, font: "Viga" }),
+        k.pos(140, 100),
+        k.anchor("center"),
+        k.color(200, 200, 200),
+    ]);
+
+    // Round Score
+    const roundScoreBox = container.add([
+        k.rect(280, 60),
+        k.pos(20, 250),
+        k.color(30, 30, 40),
+        k.outline(3, COLORS.uiBorder),
+    ]);
+
+    roundScoreBox.add([
+        k.text("Round\nscore", { size: 18, font: "Viga" }),
+        k.pos(60, 30),
+        k.anchor("center"),
+        k.color(COLORS.uiBackground),
+    ]);
+
+    const roundScoreText = roundScoreBox.add([
+        k.text("0", { size: 30, font: "Viga" }),
+        k.pos(200, 30),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        {
+            update() {
+                this.text = gameState.scoringState.roundScore.toLocaleString();
+            }
+        }
+    ]);
+
+    // Objectives List
+    const objContainer = container.add([
+        k.pos(20, 330),
+    ]);
+
+    const objectiveLabels = [];
+    const updateObjectives = () => {
+        objectiveLabels.forEach(l => k.destroy(l));
+        objectiveLabels.length = 0;
+
+        gameState.scoringState.objectives.forEach((obj, i) => {
+            const label = objContainer.add([
+                k.text(obj.label, { size: 13, font: "Inter", width: 280 }),
+                k.pos(0, i * 25),
+                k.color(obj.completed ? [100, 255, 100] : [255, 180, 100]),
+            ]);
+            objectiveLabels.push(label);
+        });
+    };
+
+    // Initial draw and update hook
+    container.onUpdate(() => {
+        // Simple hack to refresh objectives if they change (could be optimized)
+        if (objectiveLabels.length !== gameState.scoringState.objectives.length) {
+            updateObjectives();
+        }
+    });
+
+    // Dummy Buttons
+    const btnStyle = (x, y, w, h, label, color) => {
+        const b = container.add([
+            k.rect(w, h),
+            k.pos(x, y),
+            k.color(color),
+            k.outline(3, COLORS.uiBorder),
+            k.area(),
+        ]);
+        b.add([
+            k.text(label, { size: 18, font: "Viga", width: w - 10 }),
+            k.pos(w / 2, h / 2),
+            k.anchor("center"),
+            k.color(COLORS.uiBackground),
+        ]);
+        return b;
+    };
+
+    btnStyle(20, 600, 80, 100, "Run\nInfo", [240, 80, 80]);
+    btnStyle(20, 710, 80, 40, "Options", [240, 150, 40]);
+
+    // Turn/Round Displays
+    const turnVal = container.add([
+        k.text("1", { size: 24, font: "Viga" }),
+        k.pos(150, 630),
+        k.anchor("center"),
+        k.color(COLORS.uiBackground),
+        k.z(85),
+    ]);
+    const turnBox = btnStyle(110, 600, 80, 60, "", [60, 150, 240]);
+    turnBox.add([k.text("Turn", { size: 12, font: "Viga" }), k.pos(40, -10), k.anchor("center")]);
+
+    const roundVal = container.add([
+        k.text("1", { size: 24, font: "Viga" }),
+        k.pos(245, 630),
+        k.anchor("center"),
+        k.color(COLORS.uiBackground),
+        k.z(85),
+    ]);
+    const roundBox = btnStyle(205, 600, 80, 60, "", [60, 70, 80]);
+    roundBox.add([k.text("Round", { size: 12, font: "Viga" }), k.pos(40, -10), k.anchor("center")]);
+
+    return {
+        updateEnemyName(name) {
+            enemyNameText.text = name.toUpperCase();
+        },
+        updateTurn(num) {
+            turnVal.text = num.toString();
+        },
+        updateRound(num) {
+            roundVal.text = num.toString();
         }
     };
 }

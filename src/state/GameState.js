@@ -15,6 +15,12 @@ export class GameState {
         ];
         this.roundCounter = 1;
         this.scalingFactor = 1.0;
+        this.scoringState = {
+            roundScore: 0,
+            targetScore: 1200,
+            objectives: [],
+            rewards: { gold: 100, exp: 200, drops: [] }
+        };
         this.initializeParty();
     }
 
@@ -23,41 +29,41 @@ export class GameState {
         this.roundCounter = 1;
         this.scalingFactor = 1.0;
 
-        // Leader - Balanced - Light/Star
-        const hero = new BaseCharacter("Hero (Leader)", "Hero", {
+        // Sol - Dark/Star
+        const sol = new BaseCharacter("Sol", "Hero", {
             hp: 100, mp: 50, attack: 15, defense: 10,
             specialAttack: 15, specialDefense: 10, speed: 12, accuracy: 105, luck: 10
         });
-        hero.types = [ATTRIBUTES.LIGHT, ATTRIBUTES.STAR];
-        this.setupSkills(hero, "Hero");
-        this.party.push(hero);
+        sol.types = [ATTRIBUTES.DARK, ATTRIBUTES.STAR];
+        this.setupSkills(sol, "Hero");
+        this.party.push(sol);
 
-        // Member 2 - Tanky - Rock/Steel
-        const tank = new BaseCharacter("Tank", "Tank", {
+        // Alloy - Steel/Light
+        const alloy = new BaseCharacter("Alloy", "Tank", {
             hp: 150, mp: 30, attack: 12, defense: 15,
             specialAttack: 8, specialDefense: 15, speed: 8, accuracy: 95, luck: 5
         });
-        tank.types = [ATTRIBUTES.ROCK, ATTRIBUTES.STEEL];
-        this.setupSkills(tank, "Tank");
-        this.party.push(tank);
+        alloy.types = [ATTRIBUTES.STEEL, ATTRIBUTES.LIGHT];
+        this.setupSkills(alloy, "Tank");
+        this.party.push(alloy);
 
-        // Member 3 - Mage-like - Water/Ice
-        const mage = new BaseCharacter("Mage", "Mage", {
+        // Saber - Fairy/Fire
+        const saber = new BaseCharacter("Saber", "Mage", {
             hp: 70, mp: 100, attack: 10, defense: 5,
             specialAttack: 25, specialDefense: 10, speed: 10, accuracy: 100, luck: 8
         });
-        mage.types = [ATTRIBUTES.WATER, ATTRIBUTES.ICE];
-        this.setupSkills(mage, "Mage");
-        this.party.push(mage);
+        saber.types = [ATTRIBUTES.FAIRY, ATTRIBUTES.FIRE];
+        this.setupSkills(saber, "Mage");
+        this.party.push(saber);
 
-        // Member 4 - Striker - Wind/Flying
-        const rogue = new BaseCharacter("Rogue", "Rogue", {
+        // Max - Flying/Rock
+        const max = new BaseCharacter("Max", "Rogue", {
             hp: 80, mp: 40, attack: 20, defense: 8,
             specialAttack: 12, specialDefense: 8, speed: 18, accuracy: 110, luck: 15
         });
-        rogue.types = [ATTRIBUTES.WIND, ATTRIBUTES.FLYING];
-        this.setupSkills(rogue, "Rogue");
-        this.party.push(rogue);
+        max.types = [ATTRIBUTES.FLYING, ATTRIBUTES.ROCK];
+        this.setupSkills(max, "Rogue");
+        this.party.push(max);
     }
 
     setupSkills(char, className) {
@@ -105,7 +111,65 @@ export class GameState {
             this.setupSkills(enemy, "ANY");
             this.enemies.push(enemy);
         }
+        this.generateObjectives();
         return this.enemies;
+    }
+
+    generateObjectives() {
+        const objectivePool = [
+            { id: "deal_type", label: "Deal {type} Damage", type: "DAMAGE", points: 100 },
+            { id: "defeat_with", label: "Defeat an enemy with {name}", type: "DEFEAT", points: 300 },
+            { id: "super_effective", label: "Deal Super-Effective damage", type: "EFFECTIVE", points: 150 },
+            { id: "use_skill", label: "Use {rarity} Skill", type: "SKILL", points: 200 },
+            { id: "heal_juice", label: "Heal 50+ Juice in one turn", type: "REGEN", points: 250 },
+        ];
+
+        const count = k.randi(3, 6);
+        const objectives = [];
+        const usedPoolIndices = new Set();
+
+        for (let i = 0; i < count; i++) {
+            let idx;
+            do { idx = k.randi(0, objectivePool.length); } while (usedPoolIndices.has(idx));
+            usedPoolIndices.add(idx);
+
+            const base = objectivePool[idx];
+            let label = base.label;
+            let targetData = {};
+
+            if (base.id === "deal_type") {
+                const types = Object.values(ATTRIBUTES).filter(t => t !== ATTRIBUTES.PHYSICAL);
+                const type = types[k.randi(0, types.length)];
+                label = label.replace("{type}", type);
+                targetData = { type };
+            } else if (base.id === "defeat_with") {
+                const name = this.party[k.randi(0, this.party.length)].name;
+                label = label.replace("{name}", name);
+                targetData = { name };
+            } else if (base.id === "use_skill") {
+                const rarities = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
+                const rarity = rarities[k.randi(0, 3)]; // Weighted towards lower for now
+                label = label.replace("{rarity}", rarity);
+                targetData = { rarity };
+            }
+
+            objectives.push({
+                ...base,
+                label,
+                targetData,
+                completed: false,
+                currentCount: 0,
+                targetCount: 1
+            });
+        }
+
+        this.scoringState.objectives = objectives;
+        this.scoringState.roundScore = 0;
+        this.scoringState.targetScore = 1000 + (this.roundCounter * 200);
+    }
+
+    addScore(amount) {
+        this.scoringState.roundScore += amount;
     }
 
     getEnemyStats(type) {

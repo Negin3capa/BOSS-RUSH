@@ -1,4 +1,4 @@
-export const SCREEN_WIDTH = 1024;
+export const SCREEN_WIDTH = 1344;
 export const SCREEN_HEIGHT = 768;
 
 export const ATTRIBUTES = {
@@ -69,6 +69,7 @@ export const ATTRIBUTE_COLORS = {
     [ATTRIBUTES.STEEL]: [183, 183, 206],
     [ATTRIBUTES.ALMIGHTY]: [255, 255, 255],
     [ATTRIBUTES.STAR]: [255, 215, 0],
+    [ATTRIBUTES.FAIRY]: [255, 192, 203],
 };
 
 // Pokemon-inspired 17-type chart
@@ -88,6 +89,7 @@ export const ELEMENTAL_CHART = {
     [ATTRIBUTES.DARK]: { [ATTRIBUTES.FIGHTING]: 0.5, [ATTRIBUTES.PSYCHIC]: 2.0, [ATTRIBUTES.GHOST]: 2.0, [ATTRIBUTES.DARK]: 0.5, [ATTRIBUTES.FAIRY]: 0.5 },
     [ATTRIBUTES.LIGHT]: { [ATTRIBUTES.DARK]: 2.0, [ATTRIBUTES.GHOST]: 2.0, [ATTRIBUTES.STEEL]: 0.5 },
     [ATTRIBUTES.STEEL]: { [ATTRIBUTES.FIRE]: 0.5, [ATTRIBUTES.WATER]: 0.5, [ATTRIBUTES.ELECTRIC]: 0.5, [ATTRIBUTES.ICE]: 2.0, [ATTRIBUTES.ROCK]: 2.0, [ATTRIBUTES.STEEL]: 0.5, [ATTRIBUTES.FAIRY]: 2.0 },
+    [ATTRIBUTES.FAIRY]: { [ATTRIBUTES.FIRE]: 0.5, [ATTRIBUTES.POISON]: 0.5, [ATTRIBUTES.DARK]: 2.0, [ATTRIBUTES.STEEL]: 0.5, [ATTRIBUTES.DRAGON]: 2.0, [ATTRIBUTES.FIGHTING]: 2.0 },
     [ATTRIBUTES.ALMIGHTY]: {}, // No weaknesses or resistances
     [ATTRIBUTES.STAR]: { [ATTRIBUTES.ALMIGHTY]: 2.0, [ATTRIBUTES.STAR]: 0.5 },
 };
@@ -106,13 +108,15 @@ export const GAMEPLAY = {
 export const LAYOUT = {
     // Corner Positions for UI/Portraits
     POSITIONS: [
-        { x: 20, y: 120 },                  // Top-Left
-        { x: SCREEN_WIDTH - 220, y: 120 },  // Top-Right
-        { x: 20, y: SCREEN_HEIGHT - 120 }, // Bottom-Left
+        { x: 340, y: 220 },                  // Top-Left (Lowered for portrait)
+        { x: SCREEN_WIDTH - 220, y: 220 },  // Top-Right
+        { x: 340, y: SCREEN_HEIGHT - 120 }, // Bottom-Left
         { x: SCREEN_WIDTH - 220, y: SCREEN_HEIGHT - 120 }, // Bottom-Right
     ],
-    ENEMY_CENTER_X: SCREEN_WIDTH / 2,
-    ENEMY_CENTER_Y: SCREEN_HEIGHT / 2,
+    SIDE_PANEL_WIDTH: 320,
+    ENEMY_CENTER_X: 832, // (1344 + 320) / 2
+    CENTER_X: 832,       // Center of the playable area
+    ENEMY_CENTER_Y: SCREEN_HEIGHT / 2 - 20,
     BAR_WIDTH: 180,
     BAR_HEIGHT: 15,
 };

@@ -40,8 +40,6 @@ export default function BattleScene() {
     // UI Elements
     const battleUI = createBattleUI(gameState);
     const log = createMessageLog();
-    const turnCounter = createTurnCounter();
-    const roundCounter = createRoundCounter(gameState);
     const menuSystem = createMenuSystem();
 
     // Visuals for Enemies
@@ -155,6 +153,12 @@ export default function BattleScene() {
 
         return { sprite: container, border, hpBar };
     });
+
+    // Update Side Panel with first enemy's name (or "BOSS" if present)
+    const primaryEnemy = gameState.enemies.find(e => e.isBoss) || gameState.enemies[0];
+    if (primaryEnemy && battleUI.sidePanel) {
+        battleUI.sidePanel.updateEnemyName(primaryEnemy.name);
+    }
 
     const targetCursor = k.add([
         k.text("▼", { size: 40 }),
@@ -682,6 +686,26 @@ export default function BattleScene() {
             log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, false);
         }
 
+        // Scoring Logic Integration
+        gameState.scoringState.objectives.forEach(obj => {
+            if (obj.completed) return;
+
+            if (obj.id === "deal_type" && (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage"))) {
+                if (skill && skill.attribute === obj.targetData.type) {
+                    obj.completed = true;
+                    gameState.addScore(obj.points);
+                    log.updateLog(`Objective Met: ${obj.label}!`, false, [100, 255, 100]);
+                }
+            } else if (obj.id === "use_skill" && type === "SKILL" && skill) {
+                if (skill.rarity === obj.targetData.rarity) {
+                    obj.completed = true;
+                    gameState.addScore(obj.points);
+                    log.updateLog(`Objective Met: ${obj.label}!`, false, [100, 255, 100]);
+                }
+            }
+            // More objective types can be handled here (Defeat, Effective, Regen)
+        });
+
         if (type === "SKILL" && skill) source.costJuice(skill.mpCost);
 
         await k.wait(0.4);
@@ -692,7 +716,7 @@ export default function BattleScene() {
 
     function startNewRound() {
         turnCount++;
-        turnCounter.updateCount(turnCount);
+        battleUI.sidePanel.updateTurn(turnCount);
         gameState.party.forEach(h => h.resetTurn());
         gameState.enemies.forEach(e => e.resetTurn());
         playerActions = [];
@@ -756,6 +780,7 @@ export default function BattleScene() {
             gameState.initializeParty();
         } else {
             gameState.roundCounter++;
+            battleUI.sidePanel.updateRound(gameState.roundCounter);
             gameState.party.forEach(h => h.resetTurn());
         }
         k.go("battle");

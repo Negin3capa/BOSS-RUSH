@@ -10,6 +10,10 @@ k.loadFont("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVM
 k.loadSprite("nebula", "/nebula.png");
 k.loadSprite("heart", "/heart_icon.png");
 k.loadSprite("droplet", "/droplet_icon.png");
+k.loadSprite("SolSprite", "/SolSprite.png");
+k.loadSprite("AlloySprite", "/AlloySprite.png");
+k.loadSprite("SaberSprite", "/SaberSprite.png");
+k.loadSprite("MaxSprite", "/MaxSprite.png");
 
 k.scene("main", MainScreen);
 k.scene("battle", BattleScene);
