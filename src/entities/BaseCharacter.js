@@ -238,7 +238,6 @@ export class BaseCharacter {
 
         this.hp -= actualDamage;
         if (this.hp <= 0) {
-            this.hp = 0;
             this.isDead = true;
             this.statusEffects = [];
         }

@@ -1,7 +1,7 @@
 import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
-import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem } from "../ui/BattleUI";
+import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem, createTargetingInfo } from "../ui/BattleUI";
 import { RARITY_COLORS } from "../data/skills";
 
 export default function BattleScene() {
@@ -40,7 +40,8 @@ export default function BattleScene() {
     // UI Elements
     const battleUI = createBattleUI(gameState);
     const log = createMessageLog();
-    const menuSystem = createMenuSystem();
+    const menuSystem = createMenuSystem(log);
+    const targetingInfo = createTargetingInfo();
 
     // Visuals for Enemies
     const enemySprites = gameState.enemies.map((enemy, i) => {
@@ -175,11 +176,12 @@ export default function BattleScene() {
     targetCursor.hidden = true;
 
     function updateSelectionVisuals() {
-        // Reset all enemy borders and HP bars
+        // Reset all enemy borders
         enemySprites.forEach(e => {
             e.border.hidden = true;
-            e.hpBar.hidden = true;
+            e.hpBar.hidden = (turnPhase !== "EXECUTING"); // Only show HP bars during execution
         });
+        targetingInfo.hide();
 
         if (turnPhase === "PLAYER_INPUT" || turnPhase === "SELECT_SKILL") {
             battleUI.updateSelection(currentHeroIndex);
@@ -204,14 +206,13 @@ export default function BattleScene() {
                     enemySprites.forEach(e => {
                         if (!e.sprite.char.isDead) {
                             e.border.hidden = false;
-                            e.hpBar.hidden = false;
                         }
                     });
                 } else {
                     const targetEnemy = enemySprites[selectedEnemyIndex];
                     if (targetEnemy) {
                         targetEnemy.border.hidden = false;
-                        targetEnemy.hpBar.hidden = false;
+                        targetingInfo.show(targetEnemy.sprite.char, targetEnemy.sprite.pos);
                     }
                 }
             }
@@ -392,7 +393,7 @@ export default function BattleScene() {
             do {
                 selectedEnemyIndex = (selectedEnemyIndex + dir + gameState.party.length) % gameState.party.length;
                 tries++;
-                // Allow targeting dead if it's a heal action, otherwise skip dead
+                // Allow targeting dead if it's a heal action (item or skill), otherwise skip dead
             } while (!isHealAction && gameState.party[selectedEnemyIndex].isDead && tries < gameState.party.length);
         } else {
             let tries = 0;
@@ -407,7 +408,7 @@ export default function BattleScene() {
     function updateMenuVisuals() {
         if (turnPhase === "PLAYER_INPUT") {
             const hero = gameState.party[currentHeroIndex];
-            log.updateLog(`What will ${hero.name} do?`, true, COLORS.text);
+            log.updateLog(`What will ${hero.name} do?`, false, COLORS.text);
             menuSystem.show();
             menuSystem.updateMainMenu(selectedActionIndex);
         } else if (turnPhase === "SELECT_SKILL") {
@@ -492,6 +493,7 @@ export default function BattleScene() {
 
         if (currentHeroIndex >= gameState.party.length) {
             turnPhase = "EXECUTING";
+            updateSelectionVisuals(); // Hide targeting UI
             executeTurn();
         } else {
             turnPhase = "PLAYER_INPUT";
@@ -616,18 +618,18 @@ export default function BattleScene() {
                 const result = t.takeDamage(basePower, skillType, source, isSkill, category);
 
                 if (!result.hit) {
-                    log.updateLog("MISS!", false, [200, 200, 200]);
+                    log.updateLog("MISS!", true, [200, 200, 200]);
                     spawnParticles(getTargetPos(t), "X", [200, 200, 200]);
                 } else {
                     if (result.crit) {
-                        log.updateLog("CRITICAL HIT!", false, COLORS.highlight);
+                        log.updateLog("CRITICAL HIT!", true, COLORS.highlight);
                         shakeScreen(15);
                     }
-                    if (result.mult > 1.5) log.updateLog("It's super effective!", false, [255, 255, 100]);
-                    else if (result.mult > 1 && isSkill && source.types.includes(skillType)) log.updateLog("STAB Bonus!", false, [100, 255, 255]);
+                    if (result.mult > 1.5) log.updateLog("It's super effective!", true, [180, 80, 0]); // Dark Orange
+                    else if (result.mult > 1 && isSkill && source.types.includes(skillType)) log.updateLog("STAB Bonus!", true, [0, 120, 120]); // Dark Teal
 
-                    if (result.mult < 1 && result.mult > 0) log.updateLog("It's not very effective...", false, [150, 150, 200]);
-                    if (result.mult === 0) log.updateLog("It had no effect...", false, [100, 100, 100]);
+                    if (result.mult < 1 && result.mult > 0) log.updateLog("It's not very effective...", true, [100, 100, 150]);
+                    if (result.mult === 0) log.updateLog("It had no effect...", true, [80, 80, 80]);
 
                     const damageColor = (category === "Physical") ? [255, 255, 255] : (ATTRIBUTE_COLORS[skillType] || [255, 255, 255]);
                     spawnNumbers(getTargetPos(t), result.damage, result.crit ? 50 : 32, damageColor);
@@ -640,16 +642,16 @@ export default function BattleScene() {
             spawnParticles(targetPos, "🛡️", [255, 255, 150]);
         } else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
             const amount = skill ? skill.power : 50;
-            const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
+            const targets = (target === "ALL_ALLIES") ? gameState.party : [target]; // Support reviving allies even in AOE
             targets.forEach(t => {
-                if (!t || (t.isDead && type !== "ITEM")) return; // Only items can revive for now or specific skills if added
+                if (!t) return;
                 t.heal(amount);
                 spawnNumbers(getTargetPos(t), amount, 32, [100, 255, 100]);
                 spawnParticles(getTargetPos(t), "✨", [100, 255, 100]);
             });
             if (skill) {
                 await k.wait(0.4);
-                log.updateLog(`${source.name} used ${skillNameFormatted}.`, false);
+                log.updateLog(`${source.name} used ${skillNameFormatted}.`, true);
             }
         } else if (type === "SKILL" && (skill.type === "Buff" || skill.type === "Debuff")) {
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) :
@@ -683,7 +685,7 @@ export default function BattleScene() {
             await k.wait(0.4);
             const change = isBuff ? "increased" : "decreased";
             const statName = skill.effect ? skill.effect.stat : "stats";
-            log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, false);
+            log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, true);
         }
 
         // Scoring Logic Integration
@@ -694,13 +696,13 @@ export default function BattleScene() {
                 if (skill && skill.attribute === obj.targetData.type) {
                     obj.completed = true;
                     gameState.addScore(obj.points);
-                    log.updateLog(`Objective Met: ${obj.label}!`, false, [100, 255, 100]);
+                    log.updateLog(`Objective Met: ${obj.label}!`, true, [100, 255, 100]);
                 }
             } else if (obj.id === "use_skill" && type === "SKILL" && skill) {
                 if (skill.rarity === obj.targetData.rarity) {
                     obj.completed = true;
                     gameState.addScore(obj.points);
-                    log.updateLog(`Objective Met: ${obj.label}!`, false, [100, 255, 100]);
+                    log.updateLog(`Objective Met: ${obj.label}!`, true, [100, 255, 100]);
                 }
             }
             // More objective types can be handled here (Defeat, Effective, Regen)
@@ -744,7 +746,7 @@ export default function BattleScene() {
                 if (!hero.isDead) {
                     const result = hero.gainExp(expReward);
                     if (result.leveledUp) {
-                        log.updateLog(`${hero.name} leveled up to ${hero.level}!`, false, [255, 215, 0]);
+                        log.updateLog(`${hero.name} leveled up to ${hero.level}!`, true, [255, 215, 0]);
                     }
                 }
             });

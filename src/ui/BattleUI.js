@@ -1,5 +1,5 @@
 import k from "../kaplayCtx";
-import { COLORS, LAYOUT, SCREEN_WIDTH, SCREEN_HEIGHT, UI } from "../constants";
+import { COLORS, LAYOUT, SCREEN_WIDTH, SCREEN_HEIGHT, UI, ATTRIBUTE_COLORS } from "../constants";
 import { RARITY_COLORS } from "../data/skills";
 
 export function createBattleUI(gameState) {
@@ -257,9 +257,12 @@ const GET_TEXT_STYLES = () => {
 };
 
 export function createMessageLog() {
+    const frameWidth = 500;
+    const frameHeight = 90; // Slightly shorter for 3 lines
+
     const frame = k.add([
-        k.rect(500, 100), // Same size as Action Box
-        k.pos(LAYOUT.CENTER_X, 20),
+        k.rect(frameWidth, frameHeight),
+        k.pos(LAYOUT.CENTER_X, 15),
         k.color(COLORS.uiBackground),
         k.outline(UI.OUTLINE, COLORS.uiBorder),
         k.anchor("top"),
@@ -267,35 +270,136 @@ export function createMessageLog() {
         k.z(90),
     ]);
 
-    const logText = k.add([
-        k.text("What will you do?", {
-            size: 24, // Smaller to account for more text/frame constraints
-            width: 460,
-            font: "Viga",
-            styles: GET_TEXT_STYLES()
-        }),
-        k.pos(LAYOUT.CENTER_X, 70),
-        k.anchor("center"),
-        k.color(COLORS.text),
+    const messages = []; // Array of { label }
+    const MAX_MESSAGES = 3;
+    const LINE_HEIGHT = 22;
+
+    const logContainer = k.add([
+        k.pos(LAYOUT.CENTER_X - (frameWidth / 2) + 15, 25),
         k.fixed(),
         k.z(101),
-        k.scale(1),
-        {
-            updateLog(msg, noPunch = false, color = COLORS.text) {
-                this.text = msg;
-                this.color = k.rgb(color[0], color[1], color[2]);
-                if (!noPunch) {
-                    this.scale = k.vec2(UI.PUNCH_SCALE);
-                }
-            },
-            update() {
-                this.scale = k.lerp(this.scale, k.vec2(1), k.dt() * 8);
-            }
-        }
     ]);
 
-    return logText;
+    const refreshPositions = () => {
+        messages.forEach((m, i) => {
+            m.pos.y = i * LINE_HEIGHT;
+            // Opacity logic: latest is brightest, others dim slightly for focus
+            m.opacity = (i === messages.length - 1) ? 1 : 0.7;
+        });
+    };
+
+    const logObj = {
+        updateLog(msg, scroll = false, color = COLORS.text) {
+            // Avoid duplicate consecutive messages (only if we are NOT scrolling/clearing)
+            if (!scroll && messages.length > 0 && messages[messages.length - 1].text === msg) return;
+
+            if (!scroll) {
+                // Replace Mode (Clear all)
+                messages.forEach(m => k.destroy(m));
+                messages.length = 0;
+            }
+
+            // Create new label
+            const label = logContainer.add([
+                k.pos(0, 0),
+                k.text(msg, {
+                    size: 16,
+                    width: frameWidth - 30,
+                    font: "Viga",
+                    styles: GET_TEXT_STYLES()
+                }),
+                k.color(color[0], color[1], color[2]),
+                k.opacity(1),
+            ]);
+
+            messages.push(label);
+
+            if (messages.length > MAX_MESSAGES) {
+                const oldest = messages.shift();
+                k.destroy(oldest);
+            }
+
+            refreshPositions();
+        }
+    };
+
+    // Initial message
+    logObj.updateLog("What will you do?");
+
+    return logObj;
 }
+
+export function createTargetingInfo() {
+    const container = k.add([
+        k.pos(0, 0),
+        k.fixed(),
+        k.z(150),
+    ]);
+
+    // Dark Name Box
+    const nameBox = container.add([
+        k.rect(240, 45),
+        k.pos(0, 0),
+        k.color(40, 40, 45),
+        k.outline(2, [200, 200, 200]),
+        k.anchor("center"),
+    ]);
+
+    const nameText = nameBox.add([
+        k.text("", { size: 20, font: "Viga" }),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+    ]);
+
+    // Health Area (Below)
+    const hpArea = container.add([
+        k.pos(0, 35),
+        k.anchor("center"),
+    ]);
+
+    // Heart Icon (using text for now or simple shapes)
+    hpArea.add([
+        k.text("❤️", { size: 16 }),
+        k.pos(-80, 0),
+        k.anchor("center"),
+    ]);
+
+    // HP Bar Background
+    hpArea.add([
+        k.rect(140, 16),
+        k.pos(10, 0),
+        k.anchor("center"),
+        k.color(0, 0, 0),
+        k.outline(2, [100, 100, 100]),
+    ]);
+
+    // HP Bar Fill
+    const hpBar = hpArea.add([
+        k.rect(136, 12),
+        k.pos(-58, 0), // Offset from center
+        k.anchor("left"),
+        k.color(COLORS.hp),
+    ]);
+
+    container.hidden = true;
+
+    return {
+        show(enemy, pos) {
+            container.hidden = false;
+            container.pos = k.vec2(pos.x, pos.y - 120); // Position above the enemy
+            nameText.text = enemy.name.toUpperCase();
+
+            // Update HP Bar
+            const ratio = enemy.hp / enemy.maxHp;
+            hpBar.width = Math.max(0, ratio * 136);
+        },
+        hide() {
+            container.hidden = true;
+        }
+    };
+}
+
 
 export function createTurnCounter() {
     const container = k.add([
@@ -353,7 +457,7 @@ export function createRoundCounter(gameState) {
     return label;
 }
 
-export function createMenuSystem() {
+export function createMenuSystem(log) {
     const menuContainer = k.add([
         k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT - 70),
         k.anchor("center"),
@@ -361,108 +465,233 @@ export function createMenuSystem() {
         k.fixed(),
     ]);
 
-    const infoBox = k.add([
-        k.rect(500, 100),
-        k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT - 170),
-        k.anchor("center"),
-        k.color(COLORS.uiBackground),
-        k.outline(UI.OUTLINE, COLORS.uiBorder),
-        k.z(199),
-        k.fixed(),
-    ]);
+    const getSkillColors = (type = "Normal") => {
+        // Handle potential case mismatches (Fire vs FIRE vs fire)
+        const upperType = type.toUpperCase();
+        const baseColor = ATTRIBUTE_COLORS[upperType] ||
+            ATTRIBUTE_COLORS[type] ||
+            ATTRIBUTE_COLORS[Object.keys(ATTRIBUTE_COLORS).find(k => k.toUpperCase() === upperType)] ||
+            [180, 180, 180];
 
-    infoBox.hidden = true;
+        // Multiplicative darkening (0.7x) maintains saturation better than linear subtraction
+        const darkColor = baseColor.map(c => Math.floor(c * 0.7));
+        return [baseColor, darkColor];
+    };
 
-    const infoText = infoBox.add([
-        k.text("", {
-            size: 16,
-            width: 480,
-            font: "Inter",
-            styles: GET_TEXT_STYLES()
-        }),
-        k.anchor("center"),
-        k.color(COLORS.text),
-    ]);
-
-    const mainMenuWindow = menuContainer.add([
-        k.rect(500, 100),
-        k.color(COLORS.uiBackground),
-        k.outline(UI.OUTLINE, COLORS.uiBorder),
-        k.anchor("center"),
-    ]);
-
-    const mainMenuText = mainMenuWindow.add([
-        k.text("", { size: 26, font: "Viga" }),
-        k.anchor("center"),
-        k.color(COLORS.text),
-    ]);
-
-    // Skill Slots for independent coloring
-    const skillSlots = [];
-    const slotPositions = [
-        k.vec2(-140, -18), k.vec2(140, -18),
-        k.vec2(-140, 22), k.vec2(140, 22)
+    // New Skill Buttons
+    const skillButtons = [];
+    const skillBtnPositions = [
+        k.vec2(-130, -30), k.vec2(130, -30),
+        k.vec2(-130, 30), k.vec2(130, 30)
     ];
 
     for (let i = 0; i < 4; i++) {
-        const slot = mainMenuWindow.add([
-            k.text("", {
-                size: 24,
-                font: "Viga",
-                styles: GET_TEXT_STYLES()
-            }),
-            k.pos(slotPositions[i]),
+        const btn = menuContainer.add([
+            k.pos(skillBtnPositions[i]),
             k.anchor("center"),
+            k.scale(1),
         ]);
-        skillSlots.push(slot);
+
+        btn.add([
+            k.rect(244, 54),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+            k.outline(2, [0, 0, 0]),
+        ]);
+
+        btn.add([
+            k.rect(238, 48),
+            k.anchor("center"),
+            k.color(0, 0, 0),
+        ]);
+
+        btn.add([
+            k.rect(230, 40),
+            k.anchor("center"),
+            k.color(200, 200, 200),
+            "filler"
+        ]);
+
+        btn.add([
+            k.rect(230, 10),
+            k.pos(0, -12),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+            k.opacity(0.2),
+        ]);
+
+        btn.add([
+            k.rect(230, 15),
+            k.pos(0, 12),
+            k.anchor("center"),
+            k.color(150, 150, 150),
+            "gradientBottom"
+        ]);
+
+        btn.add([
+            k.text("", { size: 20, font: "Viga", styles: GET_TEXT_STYLES() }),
+            k.anchor("center"),
+            k.pos(2, 2),
+            k.color(0, 0, 0),
+            k.opacity(0.5),
+            "shadow"
+        ]);
+
+        btn.add([
+            k.text("", { size: 20, font: "Viga", styles: GET_TEXT_STYLES() }),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+            "label"
+        ]);
+
+        skillButtons.push(btn);
     }
+
+    // New Action Buttons
+    const actionButtons = [];
+    const actionData = [
+        { label: "FIGHT", colors: [[255, 60, 40], [180, 20, 0]] },    // Red/Orange
+        { label: "SKILL", colors: [[0, 160, 240], [0, 80, 160]] },   // Blue
+        { label: "DEFEND", colors: [[255, 200, 40], [220, 100, 20]] }, // Yellow/Orange
+        { label: "ITEM", colors: [[120, 200, 60], [40, 140, 20]] }    // Green
+    ];
+
+    const btnPositions = [
+        k.vec2(-130, -30), k.vec2(130, -30),
+        k.vec2(-130, 30), k.vec2(130, 30)
+    ];
+
+    actionData.forEach((data, i) => {
+        const btn = menuContainer.add([
+            k.pos(btnPositions[i]),
+            k.anchor("center"),
+            k.scale(1),
+        ]);
+
+        // White Border
+        btn.add([
+            k.rect(244, 54),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+            k.outline(2, [0, 0, 0]),
+        ]);
+
+        // Black Inner Frame
+        btn.add([
+            k.rect(238, 48),
+            k.anchor("center"),
+            k.color(0, 0, 0),
+        ]);
+
+        // Gradient (Main Color)
+        const filler = btn.add([
+            k.rect(230, 40),
+            k.anchor("center"),
+            k.color(data.colors[0][0], data.colors[0][1], data.colors[0][2]),
+            "filler"
+        ]);
+
+        // Top highlight for "gradient"
+        btn.add([
+            k.rect(230, 10),
+            k.pos(0, -12),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+            k.opacity(0.2),
+        ]);
+
+        // Bottom darker part of "gradient"
+        btn.add([
+            k.rect(230, 15),
+            k.pos(0, 12),
+            k.anchor("center"),
+            k.color(data.colors[1][0], data.colors[1][1], data.colors[1][2]),
+            k.opacity(0.8),
+        ]);
+
+        btn.add([
+            k.text(data.label, { size: 24, font: "Viga", styles: GET_TEXT_STYLES() }),
+            k.anchor("center"),
+            k.pos(2, 2), // Shadow
+            k.color(0, 0, 0),
+            k.opacity(0.5),
+        ]);
+
+        btn.add([
+            k.text(data.label, { size: 24, font: "Viga", styles: GET_TEXT_STYLES() }),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+        ]);
+
+        actionButtons.push(btn);
+    });
+
+    const pointer = menuContainer.add([
+        k.sprite("pointer"),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.rotate(90),
+        k.z(210),
+        k.scale(1.2),
+    ]);
 
     return {
         updateMainMenu(selectedIndex) {
-            infoBox.hidden = true;
             menuContainer.hidden = false;
-            skillSlots.forEach(s => s.text = "");
-            mainMenuText.hidden = false;
+            skillButtons.forEach(b => b.hidden = true);
+            actionButtons.forEach(b => b.hidden = false);
+            pointer.hidden = false;
 
-            const formatBtn = (i, label) => (i === selectedIndex ? `> ${label} <` : `  ${label}  `);
-            const row1 = `${formatBtn(0, "FIGHT")}    ${formatBtn(1, "SKILL")}`;
-            const row2 = `${formatBtn(2, "DEFEND")}    ${formatBtn(3, "ITEM")}`;
-            mainMenuText.text = `${row1}\n${row2}`;
+            const targetPos = btnPositions[selectedIndex];
+            pointer.pos = k.vec2(targetPos.x - 100, targetPos.y);
+
+            // Subtle pulse on selected
+            actionButtons.forEach((b, i) => {
+                const targetScale = (i === selectedIndex) ? 1.05 : 1;
+                b.scale = k.lerp(b.scale, k.vec2(targetScale), k.dt() * 5);
+            });
         },
         updateSkillMenu(skills, selectedIndex) {
-            infoBox.hidden = false;
             menuContainer.hidden = false;
-            mainMenuText.hidden = true;
+            actionButtons.forEach(b => b.hidden = true);
+            skillButtons.forEach(b => b.hidden = false);
+            pointer.hidden = false;
 
-            if (!skills || skills.length === 0) {
-                skillSlots[0].text = "No Skills";
-                skillSlots[0].color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
-                [1, 2, 3].forEach(i => skillSlots[i].text = "");
-                return;
-            }
-
-            skillSlots.forEach((slot, i) => {
+            skillButtons.forEach((btn, i) => {
                 const skill = skills[i];
                 if (!skill) {
-                    slot.text = "   ---   ";
-                    slot.color = k.rgb(100, 100, 100);
+                    btn.hidden = true;
                     return;
                 }
-                const cursor = (i === selectedIndex) ? ">" : " ";
-                // Just wrap the name in rarity tag
-                slot.text = `${cursor} [${skill.rarity}]${skill.name}[/${skill.rarity}] ${cursor}`;
-                slot.color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]); // Default text color
+                btn.hidden = false;
+
+                // Update Label
+                const label = btn.get("label")[0];
+                const shadow = btn.get("shadow")[0];
+                const shortName = skill.name.length > 12 ? skill.name.substring(0, 11) + "..." : skill.name;
+                label.text = shadow.text = shortName.toUpperCase();
+
+                // Update Colors
+                const skillType = skill.attribute || skill.type || "Normal";
+                const colors = getSkillColors(skillType);
+                btn.get("filler")[0].color = k.rgb(colors[0][0], colors[0][1], colors[0][2]);
+                btn.get("gradientBottom")[0].color = k.rgb(colors[1][0], colors[1][1], colors[1][2]);
+
+                const targetScale = (i === selectedIndex) ? 1.05 : 1;
+                btn.scale = k.lerp(btn.scale, k.vec2(targetScale), k.dt() * 5);
             });
 
+            const targetPos = skillBtnPositions[selectedIndex];
+            pointer.pos = k.vec2(targetPos.x - 100, targetPos.y);
+
             const selectedSkill = skills[selectedIndex];
-            if (selectedSkill) {
-                infoText.text = `${selectedSkill.name.toUpperCase()} [[${selectedSkill.rarity}]${selectedSkill.rarity}[/${selectedSkill.rarity}]]\n(${selectedSkill.mpCost} JUICE) ${selectedSkill.description}`;
-                infoText.color = k.rgb(COLORS.text[0], COLORS.text[1], COLORS.text[2]); // Default text color
+            if (selectedSkill && log) {
+                const typeText = (selectedSkill.attribute || selectedSkill.type || "NORMAL").toUpperCase();
+                log.updateLog(`[${typeText}] ${selectedSkill.name.toUpperCase()} - (${selectedSkill.mpCost} JUICE) ${selectedSkill.description}`, false);
             }
         },
         hide() {
             menuContainer.hidden = true;
-            infoBox.hidden = true;
         },
         show() {
             menuContainer.hidden = false;

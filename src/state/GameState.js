@@ -3,6 +3,10 @@ import { getRandomSkills, getWeightedRandomSkills } from "../data/skills";
 import { GAMEPLAY, ATTRIBUTES } from "../constants";
 import { k } from "../kaplayCtx";
 
+const CREATURE_NOUNS = [
+    "Slime", "Golem", "Sprite", "Beast", "Wraith", "Construct", "Elemental", "Stalker", "Sentinel", "Avian"
+];
+
 export class GameState {
     constructor() {
         this.party = [];
@@ -103,9 +107,19 @@ export class GameState {
             // Assign 1 or 2 random types
             const t1 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
             enemy.types = [t1];
+            enemy.attribute = t1; // Compatibility
             if (Math.random() > 0.6) {
                 const t2 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
                 if (t2 !== t1) enemy.types.push(t2);
+            }
+
+            // Assign Flavored Name
+            const noun = CREATURE_NOUNS[Math.floor(Math.random() * CREATURE_NOUNS.length)];
+            const typeLabel = enemy.types[0].charAt(0).toUpperCase() + enemy.types[0].slice(1).toLowerCase();
+            if (isBossRound) {
+                enemy.name = `GREATER ${typeLabel.toUpperCase()} ${noun.toUpperCase()}`;
+            } else {
+                enemy.name = `${typeLabel} ${noun}`;
             }
 
             this.setupSkills(enemy, "ANY");
