@@ -347,14 +347,25 @@ export default function BattleScene() {
         } else if (turnPhase === "SELECT_TARGET") {
             confirmTarget();
         } else if (turnPhase === "END") {
-            if (endOptionIndex === 0) {
-                if (gameState.isPartyDefeated()) {
+            if (gameState.isPartyDefeated()) {
+                // Game over screen
+                if (endOptionIndex === 0) {
                     gameRestart(true); // New Game
                 } else {
-                    gameRestart(false); // Continue
+                    k.go("main");
+                }
+            } else {
+                // Victory screen
+                if (endOptionIndex === 0) {
+                    // Cash out action
+                    const goldReward = calculateGoldReward();
+                    gameState.gold += goldReward;
+                    battleUI.sidePanel.updateGold(gameState.gold);
+                    gameRestart(false); // Continue to next round
+                } else {
+                    k.go("main");
                 }
             }
-            else k.go("main");
         }
     };
 
@@ -888,11 +899,11 @@ export default function BattleScene() {
 
         // Handle EXP and Rewards
         let expReward = 0;
+        let goldReward = 0;
         if (win) {
-            // Calculate and award gold
-            const goldReward = calculateGoldReward();
-            gameState.gold += goldReward;
-            battleUI.sidePanel.updateGold(gameState.gold);
+            // Calculate rewards but don't award gold yet
+            goldReward = calculateGoldReward();
+            log.updateLog("Your party was victorious!", true, [255, 215, 0]);
             log.updateLog(`You earned ${goldReward} gold!`, true, [255, 215, 0]);
 
             // Base EXP = 50 per enemy + bonus for boss/round
@@ -913,26 +924,105 @@ export default function BattleScene() {
             if (gameState.roundCounter % 3 === 0) {
                 gameState.scalingFactor += 0.2;
             }
+
+            // Show victory screen
+            showVictoryScreen(goldReward);
+        } else {
+            // Show game over screen
+            k.add([k.rect(SCREEN_WIDTH, SCREEN_HEIGHT), k.color(0, 0, 0), k.opacity(0.6), k.z(500)]);
+            const winBox = k.add([k.rect(600, 300), k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2), k.anchor("center"), k.color(COLORS.uiBackground), k.outline(UI.OUTLINE, COLORS.uiBorder), k.z(501)]);
+            winBox.add([k.text("GAMEOVER", { size: 60, font: "Viga" }), k.anchor("center"), k.pos(0, -50), k.color(COLORS.text)]);
+
+            const retry = winBox.add([k.rect(200, 60), k.pos(-120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
+            retry.add([k.text("RETRY", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
+
+            const quit = winBox.add([k.rect(200, 60), k.pos(120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
+            quit.add([k.text("QUIT", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
+
+            const btns = [retry, quit];
+
+            k.onUpdate(() => {
+                btns.forEach((b, i) => {
+                    b.color = i === endOptionIndex ? k.rgb(COLORS.highlight[0], COLORS.highlight[1], COLORS.highlight[2]) : k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
+                });
+            });
         }
+    }
 
-        k.add([k.rect(SCREEN_WIDTH, SCREEN_HEIGHT), k.color(0, 0, 0), k.opacity(0.6), k.z(500)]);
-        const winBox = k.add([k.rect(600, 300), k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2), k.anchor("center"), k.color(COLORS.uiBackground), k.outline(UI.OUTLINE, COLORS.uiBorder), k.z(501)]);
-        winBox.add([k.text(win ? "VICTORY" : "GAMEOVER", { size: 60, font: "Viga" }), k.anchor("center"), k.pos(0, -50), k.color(COLORS.text)]);
+    function showVictoryScreen(goldReward) {
+        // Create victory screen that slides in from the bottom
+        const victoryBox = k.add([
+            k.rect(480, 180),
+            k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT + 100), // Start below screen
+            k.anchor("center"),
+            k.color(COLORS.uiBackground),
+            k.outline(UI.OUTLINE, COLORS.uiBorder),
+            k.z(501),
+            {
+                // Animation state
+                targetY: SCREEN_HEIGHT - 70,
+                startTime: k.time(),
+                duration: 0.5,
+                update() {
+                    const elapsed = k.time() - this.startTime;
+                    const progress = Math.min(elapsed / this.duration, 1);
+                    // Ease out quad animation
+                    const easedProgress = 1 - Math.pow(1 - progress, 2);
+                    this.pos.y = SCREEN_HEIGHT + 100 + (this.targetY - (SCREEN_HEIGHT + 100)) * easedProgress;
+                }
+            }
+        ]);
 
-        const primaryBtnLabel = win ? "CONTINUE" : "RETRY";
-        const retry = winBox.add([k.rect(200, 60), k.pos(-120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
-        retry.add([k.text(primaryBtnLabel, { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
+        victoryBox.add([
+            k.text("VICTORY!", { size: 40, font: "Viga" }),
+            k.anchor("center"),
+            k.pos(0, -40),
+            k.color(COLORS.text),
+        ]);
 
-        const quit = winBox.add([k.rect(200, 60), k.pos(120, 80), k.anchor("center"), k.outline(4, COLORS.uiBorder), k.color(COLORS.uiBackground)]);
-        quit.add([k.text("QUIT", { size: 24, font: "Viga" }), k.anchor("center"), k.color(COLORS.text)]);
+        const cashOutBtn = victoryBox.add([
+            k.rect(220, 50),
+            k.pos(-120, 30),
+            k.anchor("center"),
+            k.outline(4, COLORS.uiBorder),
+            k.color(COLORS.uiBackground),
+        ]);
+        cashOutBtn.add([
+            k.text(`Cash out ${goldReward}`, { size: 20, font: "Viga" }),
+            k.anchor("center"),
+            k.color(COLORS.text),
+        ]);
 
-        const btns = [retry, quit];
+        const quitBtn = victoryBox.add([
+            k.rect(220, 50),
+            k.pos(120, 30),
+            k.anchor("center"),
+            k.outline(4, COLORS.uiBorder),
+            k.color(COLORS.uiBackground),
+        ]);
+        quitBtn.add([
+            k.text("Quit to menu", { size: 20, font: "Viga" }),
+            k.anchor("center"),
+            k.color(COLORS.text),
+        ]);
+
+        const btns = [cashOutBtn, quitBtn];
 
         k.onUpdate(() => {
             btns.forEach((b, i) => {
                 b.color = i === endOptionIndex ? k.rgb(COLORS.highlight[0], COLORS.highlight[1], COLORS.highlight[2]) : k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
             });
         });
+
+        // Handle cash out action
+        const handleCashOut = () => {
+            gameState.gold += goldReward;
+            battleUI.sidePanel.updateGold(gameState.gold);
+            gameRestart(false); // Continue to next round
+        };
+
+        // Update the existing handleConfirm function to handle victory screen
+        // We'll modify the existing handleConfirm instead of adding new listeners
     }
 
     function gameRestart(newGame = false) {
