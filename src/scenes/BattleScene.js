@@ -955,8 +955,7 @@ export default function BattleScene() {
             k.rect(480, 180),
             k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT + 100), // Start below screen
             k.anchor("center"),
-            k.color(COLORS.uiBackground),
-            k.outline(UI.OUTLINE, COLORS.uiBorder),
+            k.color(0, 0, 0), // Black background
             k.z(501),
             {
                 // Animation state
@@ -973,44 +972,52 @@ export default function BattleScene() {
             }
         ]);
 
+        // Create a separate border rectangle
+        const border = k.add([
+            k.rect(480 + 10, 180 + 10), // Thinner border
+            k.pos(LAYOUT.CENTER_X, SCREEN_HEIGHT + 100),
+            k.anchor("center"),
+            k.color(255, 255, 255), // White border
+            k.outline(2, [0, 0, 0]), // Black outline
+            k.z(500), // Behind the victory box
+            {
+                targetY: SCREEN_HEIGHT - 70,
+                startTime: k.time(),
+                duration: 0.5,
+                update() {
+                    const elapsed = k.time() - this.startTime;
+                    const progress = Math.min(elapsed / this.duration, 1);
+                    const easedProgress = 1 - Math.pow(1 - progress, 2);
+                    this.pos.y = SCREEN_HEIGHT + 100 + (this.targetY - (SCREEN_HEIGHT + 100)) * easedProgress;
+                }
+            }
+        ]);
+
         victoryBox.add([
             k.text("VICTORY!", { size: 40, font: "Viga" }),
             k.anchor("center"),
             k.pos(0, -40),
-            k.color(COLORS.text),
+            k.color(255, 255, 255), // White text
         ]);
 
         const cashOutBtn = victoryBox.add([
             k.rect(220, 50),
-            k.pos(-120, 30),
+            k.pos(0, 30), // Centered
             k.anchor("center"),
-            k.outline(4, COLORS.uiBorder),
-            k.color(COLORS.uiBackground),
+            k.outline(4, [255, 255, 255]), // White border
+            k.color(139, 69, 19), // Brown/Gold color (same as side panel)
         ]);
         cashOutBtn.add([
             k.text(`Cash out ${goldReward}`, { size: 20, font: "Viga" }),
             k.anchor("center"),
-            k.color(COLORS.text),
+            k.color(255, 215, 0), // Gold text (same as side panel)
         ]);
 
-        const quitBtn = victoryBox.add([
-            k.rect(220, 50),
-            k.pos(120, 30),
-            k.anchor("center"),
-            k.outline(4, COLORS.uiBorder),
-            k.color(COLORS.uiBackground),
-        ]);
-        quitBtn.add([
-            k.text("Quit to menu", { size: 20, font: "Viga" }),
-            k.anchor("center"),
-            k.color(COLORS.text),
-        ]);
-
-        const btns = [cashOutBtn, quitBtn];
+        const btns = [cashOutBtn];
 
         k.onUpdate(() => {
             btns.forEach((b, i) => {
-                b.color = i === endOptionIndex ? k.rgb(COLORS.highlight[0], COLORS.highlight[1], COLORS.highlight[2]) : k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
+                b.color = i === endOptionIndex ? k.rgb(160, 80, 30) : k.rgb(139, 69, 19); // Darker brown when selected
             });
         });
 
