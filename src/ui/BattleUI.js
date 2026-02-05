@@ -40,11 +40,20 @@ export function createBattleUI(gameState) {
         ]);
 
         // Portrait Sprite
-        portraitBox.add([
+        const portraitSprite = portraitBox.add([
             k.sprite(`${char.name}Sprite`),
             k.anchor("center"),
             k.pos(100, 100),
             k.scale(0.34), // Fit inside 200x200
+        ]);
+
+        // Hurt Sprite (hidden by default)
+        const hurtSprite = portraitBox.add([
+            k.sprite(`Hurt${char.name}`),
+            k.anchor("center"),
+            k.pos(100, 100),
+            k.scale(0.34),
+            k.opacity(0), // Hidden by default
         ]);
 
         // Header Label (e.g., NEUTRAL)
@@ -231,6 +240,18 @@ export function createBattleUI(gameState) {
         container.onUpdate(() => {
             shieldIcon.hidden = !char.isDefending || char.isDead;
             fallenOverlay.hidden = !char.isDead;
+            
+            // Hurt Sprite Management
+            if (char.isHurt && !char.isDead) {
+                // Show hurt sprite, hide normal sprite
+                portraitSprite.opacity = 0;
+                hurtSprite.opacity = 1;
+            } else {
+                // Show normal sprite, hide hurt sprite
+                portraitSprite.opacity = 1;
+                hurtSprite.opacity = 0;
+            }
+            
             if (char.isDead) {
                 // mainBox.color = k.rgb(150, 150, 160); // Optional: dim individual boxes
             } else {

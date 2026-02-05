@@ -425,6 +425,9 @@ export default function BattleScene() {
 
     function handleActionSelection(type) {
         const hero = gameState.party[currentHeroIndex];
+        // Start action - reset hurt state
+        hero.startAction();
+        
         if (type === "FIGHT") startTargeting(type, "ENEMIES");
         else if (type === "SKILL") {
             turnPhase = "SELECT_SKILL";
@@ -586,6 +589,18 @@ export default function BattleScene() {
             }
         }
 
+        // Trigger hurt state for targets taking damage
+        if (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage")) {
+            const targets = (target === "ALL_ENEMIES") ? gameState.enemies.filter(e => !e.isDead) :
+                (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) : [target];
+
+            targets.forEach(t => {
+                if (t && !t.isDead) {
+                    t.triggerHurt();
+                }
+            });
+        }
+
         const rarityTag = (type === "SKILL" && skill) ? skill.rarity : null;
         const skillNameFormatted = rarityTag ? `[${rarityTag}]${skill.name}[/${rarityTag}]` : (type === "SKILL" && skill ? skill.name : type);
         log.updateLog(`${source.name} uses ${skillNameFormatted}!`, false);
@@ -638,9 +653,13 @@ export default function BattleScene() {
                 await k.wait(0.3);
             }
         } else if (type === "DEFEND") {
+            // Start action - reset hurt state
+            source.startAction();
             source.defend();
             spawnParticles(targetPos, "🛡️", [255, 255, 150]);
         } else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
+            // Start action - reset hurt state
+            source.startAction();
             const amount = skill ? skill.power : 50;
             const targets = (target === "ALL_ALLIES") ? gameState.party : [target]; // Support reviving allies even in AOE
             targets.forEach(t => {
@@ -730,6 +749,12 @@ export default function BattleScene() {
         turnPhase = "PLAYER_INPUT";
         updateMenuVisuals();
     }
+
+    // Update hurt states for all characters
+    k.onUpdate(() => {
+        gameState.party.forEach(h => h.updateHurtState(k.dt()));
+        gameState.enemies.forEach(e => e.updateHurtState(k.dt()));
+    });
 
     function endGame(win) {
         turnPhase = "END";

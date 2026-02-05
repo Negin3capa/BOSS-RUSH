@@ -41,6 +41,11 @@ export class BaseCharacter {
         this.isDead = false;
         this.isDefending = false;
         this.statusEffects = []; // { stat: 'attack'|'defense'|..., amount: 1.5, duration: 3, type: 'BUFF'|'DEBUFF' }
+        
+        // Hurt Sprite State
+        this.isHurt = false;
+        this.hurtTimer = 0;
+        this.lastActionTime = 0;
     }
 
     // Level-based Stat Calculation
@@ -302,5 +307,30 @@ export class BaseCharacter {
 
     get expToNextLevel() {
         return this.level * 100;
+    }
+
+    // Hurt Sprite Management
+    triggerHurt() {
+        this.isHurt = true;
+        this.hurtTimer = 1.0; // 1 second timer
+    }
+
+    resetHurtState() {
+        this.isHurt = false;
+        this.hurtTimer = 0;
+    }
+
+    updateHurtState(dt) {
+        if (this.isHurt && this.hurtTimer > 0) {
+            this.hurtTimer -= dt;
+            if (this.hurtTimer <= 0) {
+                this.resetHurtState();
+            }
+        }
+    }
+
+    startAction() {
+        this.lastActionTime = Date.now();
+        this.resetHurtState();
     }
 }
