@@ -854,13 +854,44 @@ export function createSidePanel(gameState, initialTurnCount = 1) {
         objectiveLabels.length = 0;
 
         gameState.scoringState.objectives.forEach((obj, i) => {
-            const label = objContainer.add([
-                k.text(obj.label, { size: 13, font: "Inter", width: 280 }),
-                k.pos(0, i * 25),
-                k.color(obj.completed ? [100, 255, 150] : [180, 180, 220]),
+            const container = objContainer.add([
+                k.pos(0, i * 30),
+                k.anchor("left"),
             ]);
-            objectiveLabels.push(label);
+
+            const objText = container.add([
+                k.text(obj.label, { 
+                    size: 13, 
+                    font: "Inter", 
+                    width: 240 
+                }),
+                k.color([255, 255, 0]), // Yellow for active (always active)
+            ]);
+
+            const bonusText = container.add([
+                k.text(obj.bonus.display, { 
+                    size: 13, 
+                    font: "Inter", 
+                    width: 40 
+                }),
+                k.pos(245, 0),
+                k.color(obj.bonus.type === "additive" ? [255, 255, 255] : [255, 80, 80]), // White for additive, red for multiplicative
+            ]);
+
+            objectiveLabels.push({ container, objText, bonusText });
         });
+    };
+
+    // Function to trigger pop-out animation for objective
+    const activateObjective = (index) => {
+        if (objectiveLabels[index]) {
+            const { container } = objectiveLabels[index];
+            // Simple pop-out animation
+            container.scale = k.vec2(1.2);
+            k.wait(0.1).then(() => {
+                container.scale = k.vec2(1);
+            });
+        }
     };
 
     // Initial draw and update hook
@@ -935,6 +966,7 @@ export function createSidePanel(gameState, initialTurnCount = 1) {
         },
         updateGold(num) {
             goldVal.text = num.toString();
-        }
+        },
+        activateObjective
     };
 }

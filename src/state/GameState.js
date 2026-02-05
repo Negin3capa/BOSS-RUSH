@@ -144,6 +144,15 @@ export class GameState {
             { id: "heal_juice", label: "Heal 50+ Juice in one turn", type: "REGEN", points: 250 },
         ];
 
+        const bonusTypes = [
+            { type: "additive", value: 50, display: "+50" },
+            { type: "additive", value: 100, display: "+100" },
+            { type: "additive", value: 150, display: "+150" },
+            { type: "multiplicative", value: 1.5, display: "x1.5" },
+            { type: "multiplicative", value: 2, display: "x2" },
+            { type: "multiplicative", value: 2.5, display: "x2.5" },
+        ];
+
         const count = k.randi(3, 6);
         const objectives = [];
         const usedPoolIndices = new Set();
@@ -173,13 +182,14 @@ export class GameState {
                 targetData = { rarity };
             }
 
+            const bonus = bonusTypes[k.randi(0, bonusTypes.length)];
+
             objectives.push({
                 ...base,
                 label,
                 targetData,
-                completed: false,
                 currentCount: 0,
-                targetCount: 1
+                bonus: bonus
             });
         }
 
