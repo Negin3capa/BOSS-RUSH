@@ -113,8 +113,8 @@ export const LAYOUT = {
     POSITIONS: [
         { x: 340, y: 220 },                  // Top-Left (Lowered for portrait)
         { x: SCREEN_WIDTH - 220, y: 220 },  // Top-Right
-        { x: 340, y: SCREEN_HEIGHT - 120 }, // Bottom-Left
-        { x: SCREEN_WIDTH - 220, y: SCREEN_HEIGHT - 120 }, // Bottom-Right
+        { x: 340, y: SCREEN_HEIGHT - 77 }, // Bottom-Left (Aligned with action menu bottom)
+        { x: SCREEN_WIDTH - 220, y: SCREEN_HEIGHT - 77 }, // Bottom-Right
     ],
     SIDE_PANEL_WIDTH: 320,
     ENEMY_CENTER_X: 832, // (1344 + 320) / 2
