@@ -38,7 +38,7 @@ export default function BattleScene() {
     ]);
 
     // UI Elements
-    const battleUI = createBattleUI(gameState);
+    const battleUI = createBattleUI(gameState, turnCount);
     const log = createMessageLog();
     const menuSystem = createMenuSystem(log);
     const targetingInfo = createTargetingInfo();
@@ -640,7 +640,10 @@ export default function BattleScene() {
                         log.updateLog("CRITICAL HIT!", true, COLORS.highlight);
                         shakeScreen(15);
                     }
-                    if (result.mult > 1.5) log.updateLog("It's super effective!", true, [180, 80, 0]); // Dark Orange
+                    if (result.mult > 1.5) {
+                        log.updateLog("It's super effective!", true, [180, 80, 0]); // Dark Orange
+                        gameState.scoringState.battleMetrics.superEffectiveHits++;
+                    }
                     else if (result.mult > 1 && isSkill && source.types.includes(skillType)) log.updateLog("STAB Bonus!", true, [0, 120, 120]); // Dark Teal
 
                     if (result.mult < 1 && result.mult > 0) log.updateLog("It's not very effective...", true, [100, 100, 150]);
@@ -750,11 +753,52 @@ export default function BattleScene() {
         updateMenuVisuals();
     }
 
-    // Update hurt states for all characters
+    // Track party deaths
+    let previousAliveCount = gameState.party.filter(h => !h.isDead).length;
     k.onUpdate(() => {
+        const currentAliveCount = gameState.party.filter(h => !h.isDead).length;
+        if (currentAliveCount < previousAliveCount) {
+            gameState.scoringState.battleMetrics.partyDeaths += previousAliveCount - currentAliveCount;
+        }
+        previousAliveCount = currentAliveCount;
+
         gameState.party.forEach(h => h.updateHurtState(k.dt()));
         gameState.enemies.forEach(e => e.updateHurtState(k.dt()));
     });
+
+    function calculateGoldReward() {
+        // Base gold reward
+        let baseGold = 100 + (gameState.roundCounter * 50);
+
+        // Turn count penalty (more turns = less gold)
+        const turnPenalty = Math.max(0.1, 1 - (turnCount / 20));
+        baseGold = Math.floor(baseGold * turnPenalty);
+
+        // Round score bonus
+        const scoreBonus = Math.floor(gameState.scoringState.roundScore / 100);
+        baseGold += scoreBonus;
+
+        // Objectives met bonus
+        const completedObjectives = gameState.scoringState.objectives.filter(obj => obj.completed).length;
+        baseGold += completedObjectives * 25;
+
+        // Super effective hits bonus
+        baseGold += gameState.scoringState.battleMetrics.superEffectiveHits * 15;
+
+        // Party deaths penalty
+        const deathPenalty = Math.max(0.5, 1 - (gameState.scoringState.battleMetrics.partyDeaths * 0.1));
+        baseGold = Math.floor(baseGold * deathPenalty);
+
+        // Boss round bonus
+        if (gameState.roundCounter % 3 === 0) {
+            baseGold = Math.floor(baseGold * 1.5);
+        }
+
+        // Scaling factor
+        baseGold = Math.floor(baseGold * gameState.scalingFactor);
+
+        return Math.max(10, baseGold);
+    }
 
     function endGame(win) {
         turnPhase = "END";
@@ -762,6 +806,12 @@ export default function BattleScene() {
         // Handle EXP and Rewards
         let expReward = 0;
         if (win) {
+            // Calculate and award gold
+            const goldReward = calculateGoldReward();
+            gameState.gold += goldReward;
+            battleUI.sidePanel.updateGold(gameState.gold);
+            log.updateLog(`You earned ${goldReward} gold!`, true, [255, 215, 0]);
+
             // Base EXP = 50 per enemy + bonus for boss/round
             const totalEnemyLevels = gameState.enemies.reduce((acc, e) => acc + e.level, 0);
             expReward = Math.floor(totalEnemyLevels * 25 * gameState.scalingFactor);
@@ -803,6 +853,13 @@ export default function BattleScene() {
     }
 
     function gameRestart(newGame = false) {
+        // Reset battle metrics
+        gameState.scoringState.battleMetrics = {
+            superEffectiveHits: 0,
+            partyDeaths: 0,
+            totalTurns: 0
+        };
+        
         if (newGame) {
             gameState.initializeParty();
         } else {

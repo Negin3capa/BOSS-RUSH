@@ -19,11 +19,17 @@ export class GameState {
         ];
         this.roundCounter = 1;
         this.scalingFactor = 1.0;
+        this.gold = 0;
         this.scoringState = {
             roundScore: 0,
             targetScore: 1200,
             objectives: [],
-            rewards: { gold: 100, exp: 200, drops: [] }
+            rewards: { gold: 100, exp: 200, drops: [] },
+            battleMetrics: {
+                superEffectiveHits: 0,
+                partyDeaths: 0,
+                totalTurns: 0
+            }
         };
         this.initializeParty();
     }

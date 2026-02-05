@@ -3,7 +3,7 @@ import { COLORS, LAYOUT, SCREEN_WIDTH, SCREEN_HEIGHT, UI, ATTRIBUTE_COLORS } fro
 import { RARITY_COLORS } from "../data/skills";
 import gsap from "gsap";
 
-export function createBattleUI(gameState) {
+export function createBattleUI(gameState, initialTurnCount = 1) {
     const uiContainer = k.add([
         k.fixed(),
         k.z(100),
@@ -262,7 +262,7 @@ export function createBattleUI(gameState) {
         portraitUIs.push({ selectionBorder });
     });
 
-    const sidePanel = createSidePanel(gameState);
+    const sidePanel = createSidePanel(gameState, initialTurnCount);
 
     return {
         ui: uiContainer,
@@ -735,7 +735,7 @@ export function createMenuSystem(log) {
     };
 }
 
-export function createSidePanel(gameState) {
+export function createSidePanel(gameState, initialTurnCount = 1) {
     const container = k.add([
         k.pos(-340, 0), // Start off-screen
         k.fixed(),
@@ -892,9 +892,9 @@ export function createSidePanel(gameState) {
     btnStyle(20, 600, 80, 100, "Run\nInfo", [240, 80, 80]); // Vibrant Red
     btnStyle(20, 710, 80, 40, "Options", [240, 150, 40]);  // Vibrant Orange
 
-    // Turn/Round Displays
+    // Turn/Round/ Gold Displays
     const turnVal = container.add([
-        k.text("1", { size: 24, font: "Viga" }),
+        k.text(initialTurnCount.toString(), { size: 24, font: "Viga" }),
         k.pos(150, 630),
         k.anchor("center"),
         k.color(255, 255, 255),
@@ -904,7 +904,7 @@ export function createSidePanel(gameState) {
     turnBox.add([k.text("Turn", { size: 12, font: "Viga" }), k.pos(40, -10), k.anchor("center"), k.color(255, 255, 255)]);
 
     const roundVal = container.add([
-        k.text("1", { size: 24, font: "Viga" }),
+        k.text(gameState.roundCounter.toString(), { size: 24, font: "Viga" }),
         k.pos(245, 630),
         k.anchor("center"),
         k.color(255, 255, 255),
@@ -913,17 +913,15 @@ export function createSidePanel(gameState) {
     const roundBox = btnStyle(205, 600, 80, 60, "", [100, 80, 180]); // Vibrant Purple
     roundBox.add([k.text("Round", { size: 12, font: "Viga" }), k.pos(40, -10), k.anchor("center"), k.color(255, 255, 255)]);
 
-    return {
-        updateEnemyName(name) {
-            enemyNameText.text = name.toUpperCase();
-        },
-        updateTurn(num) {
-            turnVal.text = num.toString();
-        },
-        updateRound(num) {
-            roundVal.text = num.toString();
-        }
-    };
+    const goldVal = container.add([
+        k.text(gameState.gold.toString(), { size: 24, font: "Viga" }),
+        k.pos(197, 700),
+        k.anchor("center"),
+        k.color(255, 215, 0), // Gold color
+        k.z(85),
+    ]);
+    const goldBox = btnStyle(110, 670, 180, 60, "", [139, 69, 19]); // Brown/Gold
+    goldBox.add([k.text("Gold", { size: 12, font: "Viga" }), k.pos(90, -10), k.anchor("center"), k.color(255, 255, 255)]);
 
     return {
         updateEnemyName(name) {
@@ -934,6 +932,9 @@ export function createSidePanel(gameState) {
         },
         updateRound(num) {
             roundVal.text = num.toString();
+        },
+        updateGold(num) {
+            goldVal.text = num.toString();
         }
     };
 }
