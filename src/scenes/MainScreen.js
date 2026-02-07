@@ -100,7 +100,8 @@ export default function MainScreen() {
     k.onKeyPress("space", () => {
         if (options[selectedOption] === "START") {
             gameState.initializeParty();
-            k.go("battle");
+            gameState.generateEncounters();
+            k.go("encounter_select");
         } else if (options[selectedOption] === "QUIT") {
             k.debug.log("Quit selected");
         }
@@ -109,7 +110,8 @@ export default function MainScreen() {
     k.onKeyPress("enter", () => {
         if (options[selectedOption] === "START") {
             gameState.initializeParty();
-            k.go("battle");
+            gameState.generateEncounters();
+            k.go("encounter_select");
         }
     });
 }

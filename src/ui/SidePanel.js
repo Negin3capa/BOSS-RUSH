@@ -39,6 +39,8 @@ export function createSidePanel(gameState, options = {}) {
 
     if (scene === "battle") {
         contentElements = createBattleContent(container, gameState, initialTurnCount);
+    } else if (scene === "encounter_select") {
+        contentElements = createEncounterSelectContent(container, gameState);
     }
     // Future scenes can add their own content configurations here
     // else if (scene === "shop") { ... }
@@ -352,10 +354,251 @@ function createBattleContent(container, gameState, initialTurnCount) {
         updateAttempts(num) {
             attemptsVal.text = num.toString();
         },
+        updateRoundScore(score) {
+            roundScoreText.text = score.toLocaleString();
+            // Visual feedback - brief scale pop
+            roundScoreText.scale = k.vec2(1.2);
+            gsap.to(roundScoreText.scale, {
+                x: 1,
+                y: 1,
+                duration: 0.2,
+                ease: "power2.out"
+            });
+        },
         setScoringLocked(locked) {
             // Visual update is handled by the onUpdate hook
         },
         activateObjective
+    };
+}
+
+/**
+ * Creates the encounter select scene specific content
+ * Matches battle content layout with "Choose your next Battle" header
+ */
+function createEncounterSelectContent(container, gameState) {
+    // Header Area - "Choose your next Battle"
+    container.add([
+        k.rect(280, 70, { radius: 4 }),
+        k.pos(20, 20),
+        k.color(40, 30, 60),
+        k.outline(3, [255, 255, 255]),
+    ]);
+
+    container.add([
+        k.text("Choose your", { size: 18, font: "Viga" }),
+        k.pos(160, 38),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+    ]);
+
+    container.add([
+        k.text("next Battle", { size: 22, font: "Viga" }),
+        k.pos(160, 62),
+        k.anchor("center"),
+        k.color(COLORS.highlight),
+    ]);
+
+    // Scoring Section - Shows target score for current encounter
+    const scoreBox = container.add([
+        k.rect(280, 140, { radius: 4 }),
+        k.pos(20, 105),
+        k.color(30, 25, 45),
+        k.outline(2, [100, 100, 150]),
+    ]);
+
+    scoreBox.add([
+        k.text("Score at least", { size: 14, font: "Viga" }),
+        k.pos(140, 20),
+        k.anchor("center"),
+        k.color(200, 200, 255),
+    ]);
+
+    const targetScoreText = scoreBox.add([
+        k.text("", { size: 40, font: "Viga" }),
+        k.pos(140, 60),
+        k.anchor("center"),
+        k.scale(1),
+        k.color(255, 80, 120), // Hot Pink
+        {
+            update() {
+                const encounter = gameState.getCurrentEncounter();
+                const target = encounter ? encounter.targetScore : 0;
+                this.text = target.toLocaleString();
+            }
+        }
+    ]);
+
+    // GSAP Pulse Animation
+    gsap.to(targetScoreText.scale, {
+        x: 1.1,
+        y: 1.1,
+        duration: 0.6,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+    });
+
+    scoreBox.add([
+        k.text("to earn reward", { size: 14, font: "Viga" }),
+        k.pos(140, 100),
+        k.anchor("center"),
+        k.color(200, 200, 255),
+    ]);
+
+    // Round Score
+    const roundScoreBox = container.add([
+        k.rect(280, 60, { radius: 4 }),
+        k.pos(20, 265),
+        k.color(40, 35, 60),
+        k.outline(2, [100, 100, 150]),
+    ]);
+
+    roundScoreBox.add([
+        k.text("Round\nscore", { size: 18, font: "Viga" }),
+        k.pos(60, 30),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+    ]);
+
+    const roundScoreText = roundScoreBox.add([
+        k.text("0", { size: 30, font: "Viga" }),
+        k.pos(200, 30),
+        k.anchor("center"),
+        k.color(251, 255, 100), // Vibrant Yellow
+        {
+            update() {
+                this.text = gameState.scoringState.roundScore.toLocaleString();
+            }
+        }
+    ]);
+
+    // Blank Objectives Section
+    const objContainer = container.add([
+        k.pos(20, 345),
+    ]);
+
+    // Button helper function
+    const btnStyle = (x, y, w, h, label, color) => {
+        const b = container.add([
+            k.rect(w, h, { radius: 6 }),
+            k.pos(x, y),
+            k.color(color),
+            k.outline(3, [255, 255, 255]),
+            k.area(),
+        ]);
+
+        b.add([
+            k.text(label, { size: 18, font: "Viga", width: w - 10 }),
+            k.pos(w / 2, h / 2),
+            k.anchor("center"),
+            k.color(255, 255, 255),
+        ]);
+        return b;
+    };
+
+    // Run Info and Options buttons
+    btnStyle(20, 530, 80, 80, "Run\nInfo", [240, 80, 80]); // Vibrant Red
+    btnStyle(20, 620, 80, 40, "Options", [240, 150, 40]);  // Vibrant Orange
+
+    // Turn/Round Displays
+    const turnBox = btnStyle(110, 530, 80, 50, "", [60, 150, 240]);
+    turnBox.add([k.text("Turn", { size: 12, font: "Viga" }), k.pos(40, -8), k.anchor("center"), k.color(255, 255, 255)]);
+    
+    const turnVal = container.add([
+        k.text("1", { size: 22, font: "Viga" }),
+        k.pos(150, 555),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.z(85),
+    ]);
+
+    const roundBox = btnStyle(205, 530, 80, 50, "", [100, 80, 180]);
+    roundBox.add([k.text("Round", { size: 12, font: "Viga" }), k.pos(40, -8), k.anchor("center"), k.color(255, 255, 255)]);
+    
+    const roundVal = container.add([
+        k.text(gameState.roundCounter.toString(), { size: 22, font: "Viga" }),
+        k.pos(245, 555),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.z(85),
+    ]);
+
+    // Gold Display
+    const goldBox = btnStyle(110, 590, 175, 45, "", [139, 69, 19]);
+    goldBox.add([k.text("Gold", { size: 12, font: "Viga" }), k.pos(87, -8), k.anchor("center"), k.color(255, 255, 255)]);
+    
+    const goldVal = container.add([
+        k.text(gameState.gold.toString(), { size: 20, font: "Viga" }),
+        k.pos(197, 612),
+        k.anchor("center"),
+        k.color(255, 215, 0), // Gold color
+        k.z(85),
+    ]);
+
+    // Ante Counter
+    const anteBox = btnStyle(110, 645, 100, 45, "", [80, 40, 120]); // Dark purple
+    anteBox.add([k.text("Ante", { size: 11, font: "Viga" }), k.pos(50, -8), k.anchor("center"), k.color(200, 180, 255)]);
+    
+    const anteVal = container.add([
+        k.text(`${gameState.anteCounter}/8`, { size: 18, font: "Viga" }),
+        k.pos(160, 667),
+        k.anchor("center"),
+        k.color(200, 180, 255), // Light purple
+        k.z(85),
+        {
+            update() {
+                this.text = `${gameState.anteCounter}/8`;
+                if (gameState.anteCounter >= 7) {
+                    this.color = k.rgb(255, 215, 0); // Gold when close to winning
+                }
+            }
+        }
+    ]);
+
+    // Attempts Counter
+    const attemptsBox = btnStyle(220, 645, 65, 45, "", [60, 60, 80]); // Dark gray
+    attemptsBox.add([k.text("Try", { size: 11, font: "Viga" }), k.pos(32, -8), k.anchor("center"), k.color(200, 200, 200)]);
+    
+    const attemptsVal = container.add([
+        k.text(gameState.attemptsLeft.toString(), { size: 22, font: "Viga" }),
+        k.pos(252, 667),
+        k.anchor("center"),
+        k.color(100, 255, 100), // Green when healthy
+        k.z(85),
+        {
+            update() {
+                this.text = gameState.attemptsLeft.toString();
+                if (gameState.attemptsLeft === 0) {
+                    this.color = k.rgb(255, 60, 60); // Red when locked
+                } else if (gameState.attemptsLeft === 1) {
+                    this.color = k.rgb(255, 180, 60); // Orange when low
+                } else {
+                    this.color = k.rgb(100, 255, 100); // Green when healthy
+                }
+            }
+        }
+    ]);
+
+    return {
+        updateTurn(num) {
+            turnVal.text = num.toString();
+        },
+        updateRound(num) {
+            roundVal.text = num.toString();
+        },
+        updateGold(num) {
+            goldVal.text = num.toString();
+        },
+        updateAnte(num) {
+            anteVal.text = `${num}/8`;
+        },
+        updateAttempts(num) {
+            attemptsVal.text = num.toString();
+        },
+        activateObjective() {
+            // Not used in encounter select
+        }
     };
 }
 

@@ -185,16 +185,23 @@ export class BaseCharacter {
     takeDamage(amount, skillType = ATTRIBUTES.PHYSICAL, attacker = null, isSkill = false, category = "Physical") {
         if (this.isDead) return { damage: 0, mult: 1, hit: false, crit: false };
 
+        // Guard against NaN/undefined amount
+        if (amount === undefined || amount === null || isNaN(amount)) {
+            console.warn(`takeDamage received invalid amount: ${amount}, defaulting to 0`);
+            amount = 0;
+        }
+
         // 1. Determine Attack Type (Weapon priority for basic attacks)
         let actualSkillType = skillType;
-        if (!isSkill && attacker && attacker.equipment.weapon) {
+        if (!isSkill && attacker && attacker.equipment && attacker.equipment.weapon) {
             actualSkillType = attacker.equipment.weapon.attribute;
         }
 
         // 2. Hit/Dodge Logic - Updated: attacker's hitRate determines hit chance
         let hitChance = 100;
         if (attacker) {
-            hitChance = attacker.effectiveHitRate;
+            const attackerHitRate = attacker.effectiveHitRate;
+            hitChance = (attackerHitRate === undefined || attackerHitRate === null || isNaN(attackerHitRate)) ? 100 : attackerHitRate;
         }
         hitChance = Math.min(100, Math.max(5, hitChance));
 
@@ -229,12 +236,18 @@ export class BaseCharacter {
         let defValue = 0;
         if (category === "Physical") {
             defValue = this.effectiveDefense;
+            if (isNaN(defValue)) defValue = 0;
             if (isCrit) defValue *= 0.5;
         } else {
             defValue = this.effectiveSpDefense;
+            if (isNaN(defValue)) defValue = 0;
         }
 
         let actualDamage = (amount * typeMultiplier) - (defValue / 2);
+        if (isNaN(actualDamage)) {
+            console.warn(`actualDamage became NaN: amount=${amount}, typeMultiplier=${typeMultiplier}, defValue=${defValue}`);
+            actualDamage = 1;
+        }
         if (this.isDefending) {
             actualDamage *= GAMEPLAY.DEFEND_DAMAGE_REDUCTION;
         }

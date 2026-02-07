@@ -6,8 +6,11 @@ import { createSidePanel } from "../ui/SidePanel";
 import { RARITY_COLORS } from "../data/skills";
 
 export default function BattleScene() {
-    // Reset state on restart (enemies regen)
-    gameState.generateEnemies();
+    // Set up enemies from current encounter instead of generating new ones
+    if (!gameState.setupEncounterForBattle()) {
+        // Fallback if no encounter is set up
+        gameState.generateEnemies();
+    }
 
     // Logic State
     let turnPhase = "PLAYER_INPUT"; // PLAYER_INPUT, SELECT_SKILL, SELECT_TARGET, EXECUTING, END
@@ -704,6 +707,15 @@ export default function BattleScene() {
                     const damageColor = (category === "Physical") ? [255, 255, 255] : (ATTRIBUTE_COLORS[skillType] || [255, 255, 255]);
                     spawnNumbers(getTargetPos(t), result.damage, result.crit ? 50 : 32, damageColor);
                     shakeScreen(result.crit ? 10 : 5);
+
+                    // Add score based on damage dealt (1 point per damage dealt) - only for player party
+                    const isPlayerAction = gameState.party.includes(source);
+                    if (isPlayerAction) {
+                        const scoreAdded = gameState.addScore(result.damage);
+                        if (scoreAdded) {
+                            sidePanel.updateRoundScore(gameState.scoringState.roundScore);
+                        }
+                    }
                 }
                 await k.wait(0.3);
             }
@@ -789,7 +801,9 @@ export default function BattleScene() {
             log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, true);
         }
 
-        // Scoring Logic Integration - Infinite objectives
+        // Scoring Logic Integration - Infinite objectives (only for player actions)
+        const isPlayerAction = gameState.party.includes(source);
+        if (isPlayerAction) {
         gameState.scoringState.objectives.forEach((obj, index) => {
             let objectiveAchieved = false;
 
@@ -842,6 +856,7 @@ export default function BattleScene() {
                 }
             }
         });
+        } // End of if (isPlayerAction) block
 
         if (type === "SKILL" && skill) source.costJuice(skill.mpCost);
 
@@ -1136,15 +1151,37 @@ export default function BattleScene() {
         
         if (newGame) {
             gameState.initializeParty();
+            gameState.generateEncounters();
+            k.go("encounter_select");
         } else {
-            gameState.roundCounter++;
-            sidePanel.updateRound(gameState.roundCounter);
-            // Reset attempts for new round
-            gameState.resetAttempts();
-            sidePanel.updateAttempts(gameState.attemptsLeft);
-            gameState.party.forEach(h => h.resetTurn());
+            // Complete current encounter and check if there are more
+            const hasMoreEncounters = gameState.completeCurrentEncounter();
+            
+            if (hasMoreEncounters) {
+                // Still have encounters in this ante, go back to encounter select
+                gameState.roundCounter++;
+                gameState.resetAttempts();
+                gameState.party.forEach(h => h.resetTurn());
+                k.go("encounter_select");
+            } else {
+                // All encounters done - check if this was a boss (last encounter)
+                // Increment ante and generate new encounters
+                gameState.roundCounter++;
+                gameState.incrementAnte();
+                gameState.resetAttempts();
+                gameState.party.forEach(h => h.resetTurn());
+                
+                // Check for game win
+                if (gameState.hasWonGame()) {
+                    // Game won - will be handled by showGameWinScreen
+                    return;
+                }
+                
+                // Generate new encounters for next ante
+                gameState.generateEncounters();
+                k.go("encounter_select");
+            }
         }
-        k.go("battle");
     }
 
     function shakeScreen(amount) { k.shake(amount); }

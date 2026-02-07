@@ -1,6 +1,7 @@
 import k from "./kaplayCtx";
 import BattleScene from "./scenes/BattleScene";
 import MainScreen from "./scenes/MainScreen";
+import EncounterSelectScene from "./scenes/EncounterSelectScene";
 
 // Load Fonts
 k.loadFont("Viga", "https://fonts.gstatic.com/s/viga/v15/xMQbuFFdSaiX_QI.ttf");
@@ -31,5 +32,6 @@ k.loadSprite("pointer", "/pointer-o.png");
 
 k.scene("main", MainScreen);
 k.scene("battle", BattleScene);
+k.scene("encounter_select", EncounterSelectScene);
 
 k.go("main");
