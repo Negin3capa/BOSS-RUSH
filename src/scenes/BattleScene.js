@@ -2,6 +2,7 @@ import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
 import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem, createTargetingInfo } from "../ui/BattleUI";
+import { createSidePanel } from "../ui/SidePanel";
 import { RARITY_COLORS } from "../data/skills";
 
 export default function BattleScene() {
@@ -42,6 +43,15 @@ export default function BattleScene() {
     const log = createMessageLog();
     const menuSystem = createMenuSystem(log);
     const targetingInfo = createTargetingInfo();
+    
+    // Create global side panel
+    const sidePanel = createSidePanel(gameState, { scene: "battle", initialTurnCount: turnCount });
+    
+    // Update side panel with enemy name
+    const primaryEnemy = gameState.enemies.find(e => e.isBoss) || gameState.enemies[0];
+    if (primaryEnemy) {
+        sidePanel.updateEnemyName(primaryEnemy.name);
+    }
 
     // Visuals for Enemies
     const enemySprites = gameState.enemies.map((enemy, i) => {
@@ -156,9 +166,8 @@ export default function BattleScene() {
     });
 
     // Update Side Panel with first enemy's name (or "BOSS" if present)
-    const primaryEnemy = gameState.enemies.find(e => e.isBoss) || gameState.enemies[0];
-    if (primaryEnemy && battleUI.sidePanel) {
-        battleUI.sidePanel.updateEnemyName(primaryEnemy.name);
+    if (primaryEnemy) {
+        sidePanel.updateEnemyName(primaryEnemy.name);
     }
 
     const targetCursor = k.add([
@@ -360,7 +369,7 @@ export default function BattleScene() {
                     // Cash out action
                     const goldReward = calculateGoldReward();
                     gameState.gold += goldReward;
-                    battleUI.sidePanel.updateGold(gameState.gold);
+                    sidePanel.updateGold(gameState.gold);
                     gameRestart(false); // Continue to next round
                 } else {
                     k.go("main");
@@ -677,10 +686,13 @@ export default function BattleScene() {
                                     totalScore = Math.floor(baseScore * obj.bonus.value);
                                 }
                                 
-                                gameState.addScore(totalScore);
-                                battleUI.sidePanel.activateObjective(index);
-                                
-                                log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
+                                const scoreAdded = gameState.addScore(totalScore);
+                                if (scoreAdded) {
+                                    sidePanel.activateObjective(index);
+                                    log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
+                                } else {
+                                    log.updateLog(`Objective: ${obj.label}! (Scoring locked)`, true, [120, 120, 120]);
+                                }
                             }
                         });
                     }
@@ -727,10 +739,13 @@ export default function BattleScene() {
                         totalScore = Math.floor(baseScore * obj.bonus.value);
                     }
                     
-                    gameState.addScore(totalScore);
-                    battleUI.sidePanel.activateObjective(index);
-                    
-                    log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
+                    const scoreAdded = gameState.addScore(totalScore);
+                    if (scoreAdded) {
+                        sidePanel.activateObjective(index);
+                        log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
+                    } else {
+                        log.updateLog(`Objective: ${obj.label}! (Scoring locked)`, true, [120, 120, 120]);
+                    }
                 }
             });
         }
@@ -818,9 +833,13 @@ export default function BattleScene() {
                 gameState.addScore(totalScore);
                 
                 // Activate visual effect
-                battleUI.sidePanel.activateObjective(index);
-                
-                log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
+                const scoreAdded = gameState.addScore(totalScore);
+                if (scoreAdded) {
+                    sidePanel.activateObjective(index);
+                    log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
+                } else {
+                    log.updateLog(`Objective: ${obj.label}! (Scoring locked)`, true, [120, 120, 120]);
+                }
             }
         });
 
@@ -834,7 +853,16 @@ export default function BattleScene() {
 
     function startNewRound() {
         turnCount++;
-        battleUI.sidePanel.updateTurn(turnCount);
+        sidePanel.updateTurn(turnCount);
+        
+        // Decrement attempts each turn - if reaches 0, scoring is locked
+        const attemptsLeft = gameState.decrementAttempts();
+        sidePanel.updateAttempts(attemptsLeft);
+        
+        if (gameState.scoringLocked) {
+            log.updateLog("⚠️ Scoring locked! No more points this round.", true, [255, 60, 60]);
+        }
+        
         gameState.party.forEach(h => h.resetTurn());
         gameState.enemies.forEach(e => e.resetTurn());
         playerActions = [];
@@ -923,6 +951,17 @@ export default function BattleScene() {
             // Increment scaling after a boss battle victory
             if (gameState.roundCounter % 3 === 0) {
                 gameState.scalingFactor += 0.2;
+                
+                // Increment ante on boss defeat
+                const newAnte = gameState.incrementAnte();
+                sidePanel.updateAnte(newAnte);
+                log.updateLog(`Ante increased to ${newAnte}/8!`, true, [255, 215, 0]);
+                
+                // Check for game win condition (ante reached 8)
+                if (gameState.hasWonGame()) {
+                    showGameWinScreen();
+                    return;
+                }
             }
 
             // Show victory screen
@@ -1024,12 +1063,67 @@ export default function BattleScene() {
         // Handle cash out action
         const handleCashOut = () => {
             gameState.gold += goldReward;
-            battleUI.sidePanel.updateGold(gameState.gold);
+            sidePanel.updateGold(gameState.gold);
             gameRestart(false); // Continue to next round
         };
 
         // Update the existing handleConfirm function to handle victory screen
         // We'll modify the existing handleConfirm instead of adding new listeners
+    }
+
+    function showGameWinScreen() {
+        // Create game win screen overlay
+        k.add([k.rect(SCREEN_WIDTH, SCREEN_HEIGHT), k.color(0, 0, 0), k.opacity(0.8), k.z(600)]);
+        
+        const winBox = k.add([
+            k.rect(700, 400),
+            k.pos(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2),
+            k.anchor("center"),
+            k.color(40, 30, 60),
+            k.outline(6, [255, 215, 0]),
+            k.z(601)
+        ]);
+        
+        winBox.add([
+            k.text("🏆 YOU WON! 🏆", { size: 60, font: "Viga" }),
+            k.anchor("center"),
+            k.pos(0, -100),
+            k.color(255, 215, 0)
+        ]);
+        
+        winBox.add([
+            k.text(`You defeated 8 bosses and conquered\nthe BOSS RUSH!`, { size: 24, font: "Viga", align: "center" }),
+            k.anchor("center"),
+            k.pos(0, -20),
+            k.color(255, 255, 255)
+        ]);
+        
+        winBox.add([
+            k.text(`Final Gold: ${gameState.gold}`, { size: 28, font: "Viga" }),
+            k.anchor("center"),
+            k.pos(0, 50),
+            k.color(255, 215, 0)
+        ]);
+        
+        const newGameBtn = winBox.add([
+            k.rect(200, 60),
+            k.pos(0, 130),
+            k.anchor("center"),
+            k.outline(4, COLORS.uiBorder),
+            k.color(COLORS.highlight),
+            k.z(602)
+        ]);
+        newGameBtn.add([
+            k.text("NEW GAME", { size: 24, font: "Viga" }),
+            k.anchor("center"),
+            k.color(255, 255, 255)
+        ]);
+        
+        // Simple click to restart
+        newGameBtn.onClick(() => {
+            gameState.initializeParty();
+            k.go("main");
+        });
     }
 
     function gameRestart(newGame = false) {
@@ -1044,7 +1138,10 @@ export default function BattleScene() {
             gameState.initializeParty();
         } else {
             gameState.roundCounter++;
-            battleUI.sidePanel.updateRound(gameState.roundCounter);
+            sidePanel.updateRound(gameState.roundCounter);
+            // Reset attempts for new round
+            gameState.resetAttempts();
+            sidePanel.updateAttempts(gameState.attemptsLeft);
             gameState.party.forEach(h => h.resetTurn());
         }
         k.go("battle");

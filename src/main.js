@@ -20,6 +20,13 @@ k.loadSprite("HurtSol", "/HurtSprites/HurtSol.png");
 k.loadSprite("HurtAlloy", "/HurtSprites/HurtAlloy.png");
 k.loadSprite("HurtSaber", "/HurtSprites/HurtSaber.png");
 k.loadSprite("HurtMax", "/HurtSprites/HurtMax.png");
+
+// Load Downed Sprites
+k.loadSprite("DownedSol", "/DownedSprites/DownedSol.png");
+k.loadSprite("DownedAlloy", "/DownedSprites/DownedAlloy.png");
+k.loadSprite("DownedSaber", "/DownedSprites/DownedSaber.png");
+k.loadSprite("DownedMax", "/DownedSprites/DownedMax.png");
+
 k.loadSprite("pointer", "/pointer-o.png");
 
 k.scene("main", MainScreen);

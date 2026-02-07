@@ -31,6 +31,11 @@ export class GameState {
                 totalTurns: 0
             }
         };
+        // Ante system - increments on boss defeat, win at 8/8
+        this.anteCounter = 0;
+        // Attempts system - starts at 4 each round, decrements per turn
+        this.attemptsLeft = 4;
+        this.scoringLocked = false;
         this.initializeParty();
     }
 
@@ -199,7 +204,34 @@ export class GameState {
     }
 
     addScore(amount) {
+        // Scoring is locked when attempts reach 0
+        if (this.scoringLocked) {
+            return false; // Score not added
+        }
         this.scoringState.roundScore += amount;
+        return true; // Score added successfully
+    }
+
+    decrementAttempts() {
+        this.attemptsLeft = Math.max(0, this.attemptsLeft - 1);
+        if (this.attemptsLeft === 0) {
+            this.scoringLocked = true;
+        }
+        return this.attemptsLeft;
+    }
+
+    resetAttempts() {
+        this.attemptsLeft = 4;
+        this.scoringLocked = false;
+    }
+
+    incrementAnte() {
+        this.anteCounter = Math.min(8, this.anteCounter + 1);
+        return this.anteCounter;
+    }
+
+    hasWonGame() {
+        return this.anteCounter >= 8;
     }
 
     getEnemyStats(type) {
