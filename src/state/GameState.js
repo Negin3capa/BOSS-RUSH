@@ -203,7 +203,10 @@ export class GameState {
 
         this.scoringState.objectives = objectives;
         this.scoringState.roundScore = 0;
-        this.scoringState.targetScore = 1000 + (this.roundCounter * 200);
+        // Only set default targetScore if not already set (preserves encounter target scores)
+        if (!this.scoringState.targetScore || this.scoringState.targetScore === 0) {
+            this.scoringState.targetScore = 1000 + (this.roundCounter * 200);
+        }
     }
 
     addScore(amount) {
