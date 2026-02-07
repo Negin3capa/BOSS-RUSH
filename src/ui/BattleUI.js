@@ -680,6 +680,7 @@ export function createMenuSystem(log) {
     ]);
 
     return {
+        container: menuContainer, // Expose container for animation
         updateMainMenu(selectedIndex) {
             menuContainer.hidden = false;
             skillButtons.forEach(b => b.hidden = true);

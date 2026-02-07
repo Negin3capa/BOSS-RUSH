@@ -80,15 +80,19 @@ export default function BattleScene() {
             {
                 char: enemy,
                 id: i,
+                entryAnimationComplete: false, // NEW: Flag to track if entry animation is done
                 update() {
                     const baseScale = enemy.isBoss ? 2.5 : 1;
                     const visual = this.get("visual")[0];
                     if (!this.char.isDead) {
                         this.angle = Math.sin(k.time() * 1.0 + i) * 1.2;
-                        // Apply base scale to the current animated scale
-                        const animatedScale = this.scale.x; // Get the animated scale from GSAP
-                        this.scale = k.vec2(baseScale * (animatedScale > 0 ? animatedScale : 0.001));
-                        this.opacity = 1;
+                        // Only apply scale/opacity modifications after entry animation completes
+                        if (this.entryAnimationComplete) {
+                            // Apply base scale to the current animated scale
+                            const animatedScale = this.scale.x; // Get the animated scale from GSAP
+                            this.scale = k.vec2(baseScale * (animatedScale > 0 ? animatedScale : 0.001));
+                            this.opacity = 1;
+                        }
                         if (visual) visual.color = k.rgb(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy));
                     } else {
                         this.angle = 0;
@@ -1203,6 +1207,10 @@ export default function BattleScene() {
             onComplete: () => {
                 // Enable input after all animations complete
                 isInputEnabled = true;
+                // Mark enemy entry animations as complete
+                enemySprites.forEach(enemyData => {
+                    enemyData.sprite.entryAnimationComplete = true;
+                });
                 // Show initial menu
                 updateMenuVisuals();
             }
@@ -1264,19 +1272,20 @@ export default function BattleScene() {
         });
 
         // Phase 4: Action Menu (1.0s delay) - Slide up from bottom
-        tl.call(() => {
-            menuSystem.show();
-        }, null, 1.0);
+        menuSystem.container.pos.y = SCREEN_HEIGHT + 150; // Start below screen
+        tl.to(menuSystem.container.pos, {
+            y: SCREEN_HEIGHT - 70,
+            duration: 0.5,
+            ease: "power2.out"
+        }, 1.0);
 
-        // Phase 5: Message Log (1.3s delay) - Fade in
-        tl.call(() => {
-            log.frame.hidden = false;
-            log.frame.opacity = 0;
-        }, null, 1.3);
-
-        tl.to(log.frame, {
-            opacity: 1,
-            duration: 0.3
+        // Phase 5: Message Log (1.3s delay) - Slide down from top
+        log.frame.pos.y = -100; // Start above screen
+        log.frame.hidden = false;
+        tl.to(log.frame.pos, {
+            y: 15,
+            duration: 0.5,
+            ease: "power2.out"
         }, 1.3);
     }
 

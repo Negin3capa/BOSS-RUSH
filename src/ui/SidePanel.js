@@ -17,7 +17,7 @@ export function createSidePanel(gameState, options = {}) {
     const container = k.add([
         k.pos(-340, 0), // Start off-screen for slide-in animation
         k.fixed(),
-        k.z(80),
+        k.z(150),
     ]);
 
     // GSAP Slide-in Animation
