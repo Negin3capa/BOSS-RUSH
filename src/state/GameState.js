@@ -47,8 +47,8 @@ export class GameState {
         this.roundCounter = 1;
         this.scalingFactor = 1.0;
 
-        // Sol - Dark/Star
-        const sol = new BaseCharacter("Sol", "Hero", {
+        // EDY - Dark/Star
+        const sol = new BaseCharacter("EDY", "Hero", {
             hp: 100, mp: 50, attack: 15, defense: 10,
             specialAttack: 15, specialDefense: 10, speed: 12, accuracy: 105, luck: 10
         });
@@ -56,8 +56,8 @@ export class GameState {
         this.setupSkills(sol, "Hero");
         this.party.push(sol);
 
-        // Alloy - Steel/Light
-        const alloy = new BaseCharacter("Alloy", "Tank", {
+        // ENZO - Steel/Light
+        const alloy = new BaseCharacter("ENZO", "Tank", {
             hp: 150, mp: 30, attack: 12, defense: 15,
             specialAttack: 8, specialDefense: 15, speed: 8, accuracy: 95, luck: 5
         });
@@ -65,8 +65,8 @@ export class GameState {
         this.setupSkills(alloy, "Tank");
         this.party.push(alloy);
 
-        // Saber - Fairy/Fire
-        const saber = new BaseCharacter("Saber", "Mage", {
+        // SABRINA - Fairy/Fire
+        const saber = new BaseCharacter("SABRINA", "Mage", {
             hp: 70, mp: 100, attack: 10, defense: 5,
             specialAttack: 25, specialDefense: 10, speed: 10, accuracy: 100, luck: 8
         });
@@ -74,8 +74,8 @@ export class GameState {
         this.setupSkills(saber, "Mage");
         this.party.push(saber);
 
-        // Max - Flying/Rock
-        const max = new BaseCharacter("Max", "Rogue", {
+        // MAX - Flying/Rock
+        const max = new BaseCharacter("MAX", "Rogue", {
             hp: 80, mp: 40, attack: 20, defense: 8,
             specialAttack: 12, specialDefense: 8, speed: 18, accuracy: 110, luck: 15
         });

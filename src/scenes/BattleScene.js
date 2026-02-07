@@ -69,6 +69,7 @@ export default function BattleScene() {
     // Visuals for Enemies - Create at scale 0 for "expand from background" effect
     gameState.enemies.forEach((enemy, i) => {
         const xOffset = (i - (gameState.enemies.length - 1) / 2) * 180;
+        const baseScale = enemy.isBoss ? 2.5 : 1;
 
         // Container for better layering - start at scale 0
         const container = k.add([
@@ -80,23 +81,20 @@ export default function BattleScene() {
             {
                 char: enemy,
                 id: i,
+                baseScale: baseScale, // Store base scale for reference
                 entryAnimationComplete: false, // NEW: Flag to track if entry animation is done
                 update() {
-                    const baseScale = enemy.isBoss ? 2.5 : 1;
                     const visual = this.get("visual")[0];
                     if (!this.char.isDead) {
                         this.angle = Math.sin(k.time() * 1.0 + i) * 1.2;
-                        // Only apply scale/opacity modifications after entry animation completes
+                        // Only apply floating animation after entry animation completes
                         if (this.entryAnimationComplete) {
-                            // Apply base scale to the current animated scale
-                            const animatedScale = this.scale.x; // Get the animated scale from GSAP
-                            this.scale = k.vec2(baseScale * (animatedScale > 0 ? animatedScale : 0.001));
                             this.opacity = 1;
                         }
                         if (visual) visual.color = k.rgb(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy));
                     } else {
                         this.angle = 0;
-                        this.scale = k.vec2(baseScale);
+                        // Keep the scale at baseScale, don't modify it
                         this.opacity = 0.2;
                         if (visual) visual.color = k.rgb(100, 100, 120);
                     }
@@ -908,6 +906,11 @@ export default function BattleScene() {
     }
 
     function showVictoryScreen(goldReward) {
+        // Trigger victory state for all alive party members
+        gameState.party.forEach(hero => {
+            hero.triggerVictory();
+        });
+
         // Create victory screen that slides in from the bottom
         const victoryBox = k.add([
             k.rect(480, 180),
@@ -1052,7 +1055,10 @@ export default function BattleScene() {
             partyDeaths: 0,
             totalTurns: 0
         };
-        
+
+        // Reset victory state for all party members
+        gameState.party.forEach(h => h.resetVictoryState());
+
         if (newGame) {
             gameState.initializeParty();
             gameState.generateEncounters();
@@ -1150,9 +1156,10 @@ export default function BattleScene() {
 
         // Phase 3: Enemy (0.6s delay) - Expand from background (scale 0 to full)
         enemySprites.forEach((enemyData, index) => {
+            const targetScale = enemyData.sprite.baseScale;
             tl.to(enemyData.sprite.scale, {
-                x: 1,
-                y: 1,
+                x: targetScale,
+                y: targetScale,
                 duration: 0.6,
                 ease: "back.out(1.7)"
             }, 0.6 + (index * 0.15));

@@ -11,22 +11,28 @@ k.loadFont("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVM
 k.loadSprite("nebula", "/nebula.png");
 k.loadSprite("heart", "/heart_icon.png");
 k.loadSprite("droplet", "/droplet_icon.png");
-k.loadSprite("SolSprite", "/SolSprite.png");
-k.loadSprite("AlloySprite", "/AlloySprite.png");
-k.loadSprite("SaberSprite", "/SaberSprite.png");
-k.loadSprite("MaxSprite", "/MaxSprite.png");
+k.loadSprite("EDYSprite", "/SolSprite.png");
+k.loadSprite("ENZOSprite", "/AlloySprite.png");
+k.loadSprite("SABRINASprite", "/SaberSprite.png");
+k.loadSprite("MAXSprite", "/MaxSprite.png");
 
 // Load Hurt Sprites
-k.loadSprite("HurtSol", "/HurtSprites/HurtSol.png");
-k.loadSprite("HurtAlloy", "/HurtSprites/HurtAlloy.png");
-k.loadSprite("HurtSaber", "/HurtSprites/HurtSaber.png");
-k.loadSprite("HurtMax", "/HurtSprites/HurtMax.png");
+k.loadSprite("HurtEDY", "/HurtSprites/HurtSol.png");
+k.loadSprite("HurtENZO", "/HurtSprites/HurtAlloy.png");
+k.loadSprite("HurtSABRINA", "/HurtSprites/HurtSaber.png");
+k.loadSprite("HurtMAX", "/HurtSprites/HurtMax.png");
 
 // Load Downed Sprites
-k.loadSprite("DownedSol", "/DownedSprites/DownedSol.png");
-k.loadSprite("DownedAlloy", "/DownedSprites/DownedAlloy.png");
-k.loadSprite("DownedSaber", "/DownedSprites/DownedSaber.png");
-k.loadSprite("DownedMax", "/DownedSprites/DownedMax.png");
+k.loadSprite("DownedEDY", "/DownedSprites/DownedSol.png");
+k.loadSprite("DownedENZO", "/DownedSprites/DownedAlloy.png");
+k.loadSprite("DownedSABRINA", "/DownedSprites/DownedSaber.png");
+k.loadSprite("DownedMAX", "/DownedSprites/DownedMax.png");
+
+// Load Victory Sprites
+k.loadSprite("VictoryEDY", "/VictorySprites/VictorySol.png");
+k.loadSprite("VictoryENZO", "/VictorySprites/VictoryAlloy.png");
+k.loadSprite("VictorySABRINA", "/VictorySprites/VictorySaber.png");
+k.loadSprite("VictoryMAX", "/VictorySprites/VictoryMax.png");
 
 k.loadSprite("pointer", "/pointer-o.png");
 

@@ -46,6 +46,9 @@ export class BaseCharacter {
         this.isHurt = false;
         this.hurtTimer = 0;
         this.lastActionTime = 0;
+
+        // Victory Sprite State
+        this.isVictorious = false;
     }
 
     // Level-based Stat Calculation
@@ -345,5 +348,16 @@ export class BaseCharacter {
     startAction() {
         this.lastActionTime = Date.now();
         this.resetHurtState();
+    }
+
+    // Victory Sprite Management
+    triggerVictory() {
+        if (!this.isDead) {
+            this.isVictorious = true;
+        }
+    }
+
+    resetVictoryState() {
+        this.isVictorious = false;
     }
 }

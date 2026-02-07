@@ -65,20 +65,43 @@ export function createBattleUI(gameState, initialTurnCount = 1) {
             k.opacity(0), // Hidden by default
         ]);
 
+        // Victory Sprite (hidden by default)
+        const victorySprite = portraitBox.add([
+            k.sprite(`Victory${char.name}`),
+            k.anchor("center"),
+            k.pos(100, 100),
+            k.scale(0.34),
+            k.opacity(0), // Hidden by default
+        ]);
+
         // Header Label (e.g., NEUTRAL)
-        portraitBox.add([
+        const statusLabelBg = portraitBox.add([
             k.rect(133, 30),
             k.pos(98, 5), // Lowered slightly
             k.anchor("center"),
             k.color(COLORS.uiBorder),
             k.outline(2, COLORS.uiBackground),
+            k.z(80),
         ]);
 
-        portraitBox.add([
+        const statusLabelText = portraitBox.add([
             k.text("NEUTRAL", { size: 16, font: "Viga" }),
             k.pos(100, 5), // Lowered slightly
             k.anchor("center"),
             k.color(COLORS.uiBackground),
+            k.z(80),
+            {
+                update() {
+                    // Update label based on character state
+                    if (char.isDead) {
+                        this.text = "DOWNED";
+                        this.color = k.rgb(150, 150, 150); // Gray text for downed
+                    } else {
+                        this.text = "NEUTRAL";
+                        this.color = k.rgb(COLORS.uiBackground[0], COLORS.uiBackground[1], COLORS.uiBackground[2]);
+                    }
+                }
+            }
         ]);
 
         // Window Background (White) - Stats Box
@@ -212,6 +235,7 @@ export function createBattleUI(gameState, initialTurnCount = 1) {
         // Status Icons (Arrows & Shield)
         const statusContainer = container.add([
             k.pos(15, -185), // Move to top of portrait box
+            k.z(15), // Higher than fallenOverlay (z: 10) so it appears on top
         ]);
 
         ["attack", "defense"].forEach((stat, i) => {
@@ -220,6 +244,7 @@ export function createBattleUI(gameState, initialTurnCount = 1) {
                 k.pos(i * 20, 0),
                 k.anchor("center"),
                 k.outline(3, [0, 0, 0]),
+                k.z(15), // Higher than fallenOverlay (z: 10)
                 {
                     update() {
                         const effect = char.statusEffects.find(e => e.stat === stat);
@@ -251,21 +276,30 @@ export function createBattleUI(gameState, initialTurnCount = 1) {
             fallenOverlay.hidden = !char.isDead;
 
             // Sprite State Management
-            if (char.isDead) {
+            if (char.isVictorious) {
+                // Show victory sprite, hide others
+                portraitSprite.opacity = 0;
+                hurtSprite.opacity = 0;
+                downedSprite.opacity = 0;
+                victorySprite.opacity = 1;
+            } else if (char.isDead) {
                 // Show downed sprite, hide others
                 portraitSprite.opacity = 0;
                 hurtSprite.opacity = 0;
                 downedSprite.opacity = 1;
+                victorySprite.opacity = 0;
             } else if (char.isHurt) {
                 // Show hurt sprite, hide others
                 portraitSprite.opacity = 0;
                 hurtSprite.opacity = 1;
                 downedSprite.opacity = 0;
+                victorySprite.opacity = 0;
             } else {
                 // Show normal sprite, hide others
                 portraitSprite.opacity = 1;
                 hurtSprite.opacity = 0;
                 downedSprite.opacity = 0;
+                victorySprite.opacity = 0;
             }
         });
 
