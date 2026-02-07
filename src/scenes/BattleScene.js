@@ -449,7 +449,7 @@ export default function BattleScene() {
     function updateMenuVisuals() {
         if (turnPhase === "PLAYER_INPUT") {
             const hero = gameState.party[currentHeroIndex];
-            log.updateLog(`What will ${hero.name} do?`, false, COLORS.text);
+            log.updateLog(`What will ${hero.name} do?`, false);
             menuSystem.show();
             menuSystem.updateMainMenu(selectedActionIndex);
         } else if (turnPhase === "SELECT_SKILL") {
@@ -539,7 +539,7 @@ export default function BattleScene() {
         } else {
             turnPhase = "PLAYER_INPUT";
             updateMenuVisuals();
-            log.updateLog(`What will ${gameState.party[currentHeroIndex].name} do?`, false, COLORS.text);
+            log.updateLog(`What will ${gameState.party[currentHeroIndex].name} do?`, false);
         }
     }
 
@@ -679,45 +679,20 @@ export default function BattleScene() {
                 const result = t.takeDamage(basePower, skillType, source, isSkill, category);
 
                 if (!result.hit) {
-                    log.updateLog("MISS!", true, [200, 200, 200]);
+                    log.updateLog("MISS!", true);
                     spawnParticles(getTargetPos(t), "X", [200, 200, 200]);
                 } else {
                     if (result.crit) {
-                        log.updateLog("CRITICAL HIT!", true, COLORS.highlight);
+                        log.updateLog("CRITICAL HIT!", true);
                         shakeScreen(15);
                     }
                     if (result.mult > 1.5) {
-                        log.updateLog("It's super effective!", true, [180, 80, 0]); // Dark Orange
+                        log.updateLog("It's super effective!", true);
                         gameState.scoringState.battleMetrics.superEffectiveHits++;
                         
-                        // Check for super effective objective (infinite)
-                        gameState.scoringState.objectives.forEach((obj, index) => {
-                            if (obj.id === "super_effective") {
-                                obj.currentCount++;
-                                
-                                // Calculate score
-                                let baseScore = obj.points;
-                                let totalScore = baseScore;
-                                if (obj.bonus.type === "additive") {
-                                    totalScore += obj.bonus.value;
-                                } else if (obj.bonus.type === "multiplicative") {
-                                    totalScore = Math.floor(baseScore * obj.bonus.value);
-                                }
-                                
-                                const scoreAdded = gameState.addScore(totalScore);
-                                if (scoreAdded) {
-                                    sidePanel.activateObjective(index);
-                                    log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
-                                } else {
-                                    log.updateLog(`Objective: ${obj.label}! (Scoring locked)`, true, [120, 120, 120]);
-                                }
-                            }
-                        });
                     }
-                    else if (result.mult > 1 && isSkill && source.types.includes(skillType)) log.updateLog("STAB Bonus!", true, [0, 120, 120]); // Dark Teal
-
-                    if (result.mult < 1 && result.mult > 0) log.updateLog("It's not very effective...", true, [100, 100, 150]);
-                    if (result.mult === 0) log.updateLog("It had no effect...", true, [80, 80, 80]);
+                    if (result.mult < 1 && result.mult > 0) log.updateLog("It's not very effective...", true);
+                    if (result.mult === 0) log.updateLog("It had no effect...", true);
 
                     const damageColor = (category === "Physical") ? [255, 255, 255] : (ATTRIBUTE_COLORS[skillType] || [255, 255, 255]);
                     spawnNumbers(getTargetPos(t), result.damage, result.crit ? 50 : 32, damageColor);
@@ -751,31 +726,6 @@ export default function BattleScene() {
             spawnParticles(getTargetPos(t), "✨", [100, 255, 100]);
         });
         
-        // Check for heal juice objective (infinite)
-        if (amount >= 50) {
-            gameState.scoringState.objectives.forEach((obj, index) => {
-                if (obj.id === "heal_juice") {
-                    obj.currentCount++;
-                    
-                    // Calculate score
-                    let baseScore = obj.points;
-                    let totalScore = baseScore;
-                    if (obj.bonus.type === "additive") {
-                        totalScore += obj.bonus.value;
-                    } else if (obj.bonus.type === "multiplicative") {
-                        totalScore = Math.floor(baseScore * obj.bonus.value);
-                    }
-                    
-                    const scoreAdded = gameState.addScore(totalScore);
-                    if (scoreAdded) {
-                        sidePanel.activateObjective(index);
-                        log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
-                    } else {
-                        log.updateLog(`Objective: ${obj.label}! (Scoring locked)`, true, [120, 120, 120]);
-                    }
-                }
-            });
-        }
         
         if (skill) {
             await k.wait(0.4);
@@ -816,63 +766,6 @@ export default function BattleScene() {
             log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, true);
         }
 
-        // Scoring Logic Integration - Infinite objectives (only for player actions)
-        const isPlayerAction = gameState.party.includes(source);
-        if (isPlayerAction) {
-        gameState.scoringState.objectives.forEach((obj, index) => {
-            let objectiveAchieved = false;
-
-            if (obj.id === "deal_type" && (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage"))) {
-                if (skill && skill.attribute === obj.targetData.type) {
-                    objectiveAchieved = true;
-                }
-            } else if (obj.id === "use_skill" && type === "SKILL" && skill) {
-                if (skill.rarity === obj.targetData.rarity) {
-                    objectiveAchieved = true;
-                }
-            } else if (obj.id === "super_effective" && (type === "FIGHT" || (type === "SKILL" && skill.type === "Damage"))) {
-                // Handled earlier when dealing damage
-            } else if (obj.id === "heal_juice" && (type === "ITEM" || (type === "SKILL" && skill.type === "Heal"))) {
-                // Handled earlier when healing
-            }
-
-            if (objectiveAchieved) {
-                obj.currentCount++;
-                
-                // Calculate score based on objective type and base value
-                let baseScore = obj.points;
-                
-                // Adjust base score based on skill type
-                if (type === "SKILL") {
-                    if (skill.type === "Heal") {
-                        baseScore = Math.floor(baseScore * 1.2); // Healing skills get 20% bonus
-                    } else if (skill.type === "Damage") {
-                        baseScore = Math.floor(baseScore * 0.9); // Damage skills get 10% reduction
-                    }
-                }
-
-                // Apply bonus
-                let totalScore = baseScore;
-                if (obj.bonus.type === "additive") {
-                    totalScore += obj.bonus.value;
-                } else if (obj.bonus.type === "multiplicative") {
-                    totalScore = Math.floor(baseScore * obj.bonus.value);
-                }
-
-                gameState.addScore(totalScore);
-                
-                // Activate visual effect
-                const scoreAdded = gameState.addScore(totalScore);
-                if (scoreAdded) {
-                    sidePanel.activateObjective(index);
-                    log.updateLog(`Objective: ${obj.label}! +${totalScore} points`, true, [255, 255, 0]);
-                } else {
-                    log.updateLog(`Objective: ${obj.label}! (Scoring locked)`, true, [120, 120, 120]);
-                }
-            }
-        });
-        } // End of if (isPlayerAction) block
-
         if (type === "SKILL" && skill) source.costJuice(skill.mpCost);
 
         await k.wait(0.4);
@@ -889,9 +782,6 @@ export default function BattleScene() {
         const attemptsLeft = gameState.decrementAttempts();
         sidePanel.updateAttempts(attemptsLeft);
         
-        if (gameState.scoringLocked) {
-            log.updateLog("⚠️ Scoring locked! No more points this round.", true, [255, 60, 60]);
-        }
         
         gameState.party.forEach(h => h.resetTurn());
         gameState.enemies.forEach(e => e.resetTurn());
@@ -961,8 +851,8 @@ export default function BattleScene() {
         if (win) {
             // Calculate rewards but don't award gold yet
             goldReward = calculateGoldReward();
-            log.updateLog("Your party was victorious!", true, [255, 215, 0]);
-            log.updateLog(`You earned ${goldReward} gold!`, true, [255, 215, 0]);
+            log.updateLog("Your party was victorious!", true);
+            log.updateLog(`You earned ${goldReward} gold!`, true);
 
             // Base EXP = 50 per enemy + bonus for boss/round
             const totalEnemyLevels = gameState.enemies.reduce((acc, e) => acc + e.level, 0);
@@ -973,7 +863,7 @@ export default function BattleScene() {
                 if (!hero.isDead) {
                     const result = hero.gainExp(expReward);
                     if (result.leveledUp) {
-                        log.updateLog(`${hero.name} leveled up to ${hero.level}!`, true, [255, 215, 0]);
+                        log.updateLog(`${hero.name} leveled up to ${hero.level}!`, true);
                     }
                 }
             });
@@ -985,7 +875,6 @@ export default function BattleScene() {
                 // Increment ante on boss defeat
                 const newAnte = gameState.incrementAnte();
                 sidePanel.updateAnte(newAnte);
-                log.updateLog(`Ante increased to ${newAnte}/8!`, true, [255, 215, 0]);
                 
                 // Check for game win condition (ante reached 8)
                 if (gameState.hasWonGame()) {
@@ -1211,6 +1100,9 @@ export default function BattleScene() {
                 enemySprites.forEach(enemyData => {
                     enemyData.sprite.entryAnimationComplete = true;
                 });
+                // Set initial message with first alive hero's name
+                const firstHero = gameState.party[currentHeroIndex];
+                log.updateLog(`What will ${firstHero.name} do?`, false);
                 // Show initial menu
                 updateMenuVisuals();
             }
