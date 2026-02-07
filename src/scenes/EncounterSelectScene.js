@@ -72,8 +72,11 @@ export default function EncounterSelectScene() {
                 isSelectable: isCurrent && !isCompleted,
                 baseY: 0,
                 update() {
+                    // Don't modify position during scene transition (let GSAP handle it)
+                    if (isTransitioning) return;
+                    
                     // Hover animation for selectable cards
-                    if (this.isSelectable && index === selectedEncounter && !isTransitioning) {
+                    if (this.isSelectable && index === selectedEncounter) {
                         this.pos.y = this.baseY + Math.sin(k.time() * 4) * 5;
                     } else {
                         this.pos.y = this.baseY;
@@ -346,27 +349,47 @@ export default function EncounterSelectScene() {
 
         isTransitioning = true;
 
-        // Fade to black
-        const fadeOverlay = k.add([
-            k.rect(SCREEN_WIDTH, SCREEN_HEIGHT),
-            k.color(0, 0, 0),
-            k.opacity(0),
-            k.z(1000),
-            k.fixed(),
-        ]);
+        // Set up the encounter for battle before animation
+        gameState.setupEncounterForBattle();
 
-        // GSAP fade animation
-        gsap.to(fadeOverlay, {
-            opacity: 1,
-            duration: 0.5,
-            ease: "power2.in",
+        // Animate all cards scrolling down off-screen
+        const tl = gsap.timeline({
             onComplete: () => {
-                // Set up the encounter for battle
-                gameState.setupEncounterForBattle();
-                // Go to battle scene
+                // Go to battle scene after cards exit
                 k.go("battle");
             }
         });
+
+        // Add title to animation
+        tl.to(titleContainer.pos, {
+            y: SCREEN_HEIGHT + 100,
+            duration: 0.4,
+            ease: "power2.in"
+        }, 0);
+
+        // Add instructions to animation
+        tl.to(instructions.pos, {
+            y: SCREEN_HEIGHT + 100,
+            duration: 0.4,
+            ease: "power2.in"
+        }, 0);
+
+        // Animate side panel swiping left out of view
+        tl.add(sidePanel.animateOut(), 0);
+
+
+        // Animate each card scrolling down with stagger
+        encounterCards.forEach((item, index) => {
+            tl.to(item.card.pos, {
+                y: SCREEN_HEIGHT + 300,
+                duration: 0.5,
+                ease: "power2.in"
+            }, index * 0.1);
+        });
+
+        // Hide arrows immediately
+        leftArrow.opacity = 0;
+        rightArrow.opacity = 0;
     }
 
     // Keyboard input

@@ -332,6 +332,7 @@ export function createMessageLog() {
     };
 
     const logObj = {
+        frame,
         updateLog(msg, scroll = false, color = COLORS.text) {
             // Avoid duplicate consecutive messages (only if we are NOT scrolling/clearing)
             if (!scroll && messages.length > 0 && messages[messages.length - 1].text === msg) return;

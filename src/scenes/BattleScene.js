@@ -4,6 +4,7 @@ import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS
 import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem, createTargetingInfo } from "../ui/BattleUI";
 import { createSidePanel } from "../ui/SidePanel";
 import { RARITY_COLORS } from "../data/skills";
+import gsap from "gsap";
 
 export default function BattleScene() {
     // Set up enemies from current encounter instead of generating new ones
@@ -22,6 +23,7 @@ export default function BattleScene() {
     let selectedEnemyIndex = 0;
     let endOptionIndex = 0;
     let selectedActionIndex = 0;
+    let isInputEnabled = false; // NEW: Input lock during entry animation
 
     // Command Memory
     let lastActionIndexDuringTurn = 0;
@@ -41,30 +43,39 @@ export default function BattleScene() {
         }
     ]);
 
-    // UI Elements
-    const battleUI = createBattleUI(gameState, turnCount);
-    const log = createMessageLog();
-    const menuSystem = createMenuSystem(log);
-    const targetingInfo = createTargetingInfo();
-    
-    // Create global side panel
+    // Create global side panel first (shows objectives and enemy name)
     const sidePanel = createSidePanel(gameState, { scene: "battle", initialTurnCount: turnCount });
     
-    // Update side panel with enemy name
+    // Update side panel with enemy name immediately
     const primaryEnemy = gameState.enemies.find(e => e.isBoss) || gameState.enemies[0];
     if (primaryEnemy) {
         sidePanel.updateEnemyName(primaryEnemy.name);
     }
 
-    // Visuals for Enemies
-    const enemySprites = gameState.enemies.map((enemy, i) => {
+    // UI Elements - Create but position off-screen initially
+    const battleUI = createBattleUI(gameState, turnCount);
+    const log = createMessageLog();
+    const menuSystem = createMenuSystem(log);
+    const targetingInfo = createTargetingInfo();
+    
+    // Hide elements initially for entry animation
+    battleUI.ui.hidden = true;
+    log.frame.hidden = true;
+    menuSystem.hide();
+    
+    // Store references for animation
+    const enemySprites = [];
+    
+    // Visuals for Enemies - Create at scale 0 for "expand from background" effect
+    gameState.enemies.forEach((enemy, i) => {
         const xOffset = (i - (gameState.enemies.length - 1) / 2) * 180;
 
-        // Container for better layering
+        // Container for better layering - start at scale 0
         const container = k.add([
             k.pos(LAYOUT.ENEMY_CENTER_X + xOffset, LAYOUT.ENEMY_CENTER_Y),
             k.anchor("center"),
-            k.opacity(1),
+            k.opacity(0), // Start invisible
+            k.scale(0), // Start at scale 0 for expand effect
             "enemy",
             {
                 char: enemy,
@@ -74,7 +85,9 @@ export default function BattleScene() {
                     const visual = this.get("visual")[0];
                     if (!this.char.isDead) {
                         this.angle = Math.sin(k.time() * 1.0 + i) * 1.2;
-                        this.scale = k.vec2(baseScale + Math.sin(k.time() * 2.5 + i) * 0.015);
+                        // Apply base scale to the current animated scale
+                        const animatedScale = this.scale.x; // Get the animated scale from GSAP
+                        this.scale = k.vec2(baseScale * (animatedScale > 0 ? animatedScale : 0.001));
                         this.opacity = 1;
                         if (visual) visual.color = k.rgb(...(ATTRIBUTE_COLORS[enemy.attribute] || COLORS.enemy));
                     } else {
@@ -165,13 +178,8 @@ export default function BattleScene() {
             ]);
         });
 
-        return { sprite: container, border, hpBar };
+        enemySprites.push({ sprite: container, border, hpBar });
     });
-
-    // Update Side Panel with first enemy's name (or "BOSS" if present)
-    if (primaryEnemy) {
-        sidePanel.updateEnemyName(primaryEnemy.name);
-    }
 
     const targetCursor = k.add([
         k.text("▼", { size: 40 }),
@@ -303,6 +311,7 @@ export default function BattleScene() {
     const actions = ["FIGHT", "SKILL", "DEFEND", "ITEM"];
 
     const handleLeft = () => {
+        if (!isInputEnabled) return; // NEW: Check input lock
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex % 2 === 1 ? selectedActionIndex - 1 : selectedActionIndex + 1;
         } else if (turnPhase === "SELECT_SKILL") {
@@ -316,6 +325,7 @@ export default function BattleScene() {
     };
 
     const handleRight = () => {
+        if (!isInputEnabled) return; // NEW: Check input lock
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex % 2 === 0 ? selectedActionIndex + 1 : selectedActionIndex - 1;
         } else if (turnPhase === "SELECT_SKILL") {
@@ -329,6 +339,7 @@ export default function BattleScene() {
     };
 
     const handleUp = () => {
+        if (!isInputEnabled) return; // NEW: Check input lock
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex >= 2 ? selectedActionIndex - 2 : selectedActionIndex + 2;
         } else if (turnPhase === "SELECT_SKILL") {
@@ -340,6 +351,7 @@ export default function BattleScene() {
     };
 
     const handleDown = () => {
+        if (!isInputEnabled) return; // NEW: Check input lock
         if (turnPhase === "PLAYER_INPUT") {
             selectedActionIndex = selectedActionIndex < 2 ? selectedActionIndex + 2 : selectedActionIndex - 2;
         } else if (turnPhase === "SELECT_SKILL") {
@@ -351,6 +363,7 @@ export default function BattleScene() {
     };
 
     const handleConfirm = () => {
+        if (!isInputEnabled) return; // NEW: Check input lock
         if (turnPhase === "PLAYER_INPUT") {
             lastActionIndexDuringTurn = selectedActionIndex;
             handleActionSelection(actions[selectedActionIndex]);
@@ -382,6 +395,7 @@ export default function BattleScene() {
     };
 
     const handleBack = () => {
+        if (!isInputEnabled) return; // NEW: Check input lock
         if (turnPhase === "SELECT_SKILL") {
             turnPhase = "PLAYER_INPUT";
             updateMenuVisuals();
@@ -442,9 +456,6 @@ export default function BattleScene() {
         }
         updateSelectionVisuals();
     }
-
-    // Call immediately to show Turn 1
-    updateMenuVisuals();
 
     function handleActionSelection(type) {
         const hero = gameState.party[currentHeroIndex];
@@ -1185,4 +1196,92 @@ export default function BattleScene() {
     }
 
     function shakeScreen(amount) { k.shake(amount); }
+
+    // NEW: Entry Animation Sequence
+    function playEntryAnimation() {
+        const tl = gsap.timeline({
+            onComplete: () => {
+                // Enable input after all animations complete
+                isInputEnabled = true;
+                // Show initial menu
+                updateMenuVisuals();
+            }
+        });
+
+        // Phase 1: Side Panel (immediate - already sliding in via its own animation)
+        // Side panel is already created and animating via its own GSAP
+
+        // Phase 2: Party Members (0.2s delay) - Scroll in from corners
+        battleUI.ui.hidden = false;
+        const partyStartPositions = [
+            { x: -250, y: 220 },      // Top-left from left
+            { x: SCREEN_WIDTH + 50, y: 220 },  // Top-right from right
+            { x: -250, y: SCREEN_HEIGHT - 77 }, // Bottom-left from left
+            { x: SCREEN_WIDTH + 50, y: SCREEN_HEIGHT - 77 }  // Bottom-right from right
+        ];
+
+        // Get the party member containers from battleUI
+        const partyContainers = battleUI.ui.get("*");
+        
+        partyContainers.forEach((container, index) => {
+            if (index < 4) {
+                const startPos = partyStartPositions[index];
+                const endPos = LAYOUT.POSITIONS[index];
+                
+                // Set initial position off-screen
+                container.pos.x = startPos.x;
+                container.pos.y = startPos.y;
+                container.opacity = 0;
+
+                // Animate to final position
+                tl.to(container.pos, {
+                    x: endPos.x,
+                    y: endPos.y,
+                    duration: 0.5,
+                    ease: "power2.out"
+                }, 0.2 + (index * 0.1));
+
+                tl.to(container, {
+                    opacity: 1,
+                    duration: 0.3
+                }, 0.2 + (index * 0.1));
+            }
+        });
+
+        // Phase 3: Enemy (0.6s delay) - Expand from background (scale 0 to full)
+        enemySprites.forEach((enemyData, index) => {
+            tl.to(enemyData.sprite.scale, {
+                x: 1,
+                y: 1,
+                duration: 0.6,
+                ease: "back.out(1.7)"
+            }, 0.6 + (index * 0.15));
+
+            tl.to(enemyData.sprite, {
+                opacity: 1,
+                duration: 0.4
+            }, 0.6 + (index * 0.15));
+        });
+
+        // Phase 4: Action Menu (1.0s delay) - Slide up from bottom
+        tl.call(() => {
+            menuSystem.show();
+        }, null, 1.0);
+
+        // Phase 5: Message Log (1.3s delay) - Fade in
+        tl.call(() => {
+            log.frame.hidden = false;
+            log.frame.opacity = 0;
+        }, null, 1.3);
+
+        tl.to(log.frame, {
+            opacity: 1,
+            duration: 0.3
+        }, 1.3);
+    }
+
+    // Start entry animation after a brief delay to ensure everything is created
+    k.wait(0.1).then(() => {
+        playEntryAnimation();
+    });
 }

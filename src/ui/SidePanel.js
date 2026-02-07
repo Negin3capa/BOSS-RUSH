@@ -55,6 +55,13 @@ export function createSidePanel(gameState, options = {}) {
         },
         show() {
             container.hidden = false;
+        },
+        animateOut() {
+            return gsap.to(container.pos, {
+                x: -340,
+                duration: 0.5,
+                ease: "power2.in"
+            });
         }
     };
 }
