@@ -275,6 +275,9 @@ export function createBattleUI(gameState, initialTurnCount = 1) {
             shieldIcon.hidden = !char.isDefending || char.isDead;
             fallenOverlay.hidden = !char.isDead;
 
+            // Check for critical health (10% or less)
+            const isCriticalHealth = !char.isDead && char.hp / char.maxHp <= 0.1;
+
             // Sprite State Management
             if (char.isVictorious) {
                 // Show victory sprite, hide others
@@ -288,8 +291,8 @@ export function createBattleUI(gameState, initialTurnCount = 1) {
                 hurtSprite.opacity = 0;
                 downedSprite.opacity = 1;
                 victorySprite.opacity = 0;
-            } else if (char.isHurt) {
-                // Show hurt sprite, hide others
+            } else if (char.isHurt || isCriticalHealth) {
+                // Show hurt sprite when damaged or at critical health
                 portraitSprite.opacity = 0;
                 hurtSprite.opacity = 1;
                 downedSprite.opacity = 0;

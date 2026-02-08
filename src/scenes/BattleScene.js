@@ -679,6 +679,10 @@ export default function BattleScene() {
                 if (!result.hit) {
                     log.updateLog("MISS!", true);
                     spawnParticles(getTargetPos(t), "X", [200, 200, 200]);
+                    // Trigger hurt sprite on attacker when they miss
+                    if (gameState.party.includes(source)) {
+                        source.triggerHurt();
+                    }
                 } else {
                     if (result.crit) {
                         log.updateLog("CRITICAL HIT!", true);

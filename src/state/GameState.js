@@ -321,9 +321,12 @@ export class GameState {
             const type = i === 0 ? "Simple" : (i === 1 ? "Stronger" : "Boss");
             const count = i === 0 ? 1 : (i === 1 ? k.randi(1, 3) : 1);
             
+            // Calculate target score for this encounter
+            const targetScore = 300 + (i * 150) + (this.anteCounter * 100);
+            
             const enemies = [];
             for (let j = 0; j < count; j++) {
-                const stats = this.getEncounterStats(type, anteScaling);
+                const stats = this.getEncounterStats(type, anteScaling, targetScore);
                 const enemy = new BaseCharacter(
                     i === 2 ? "BOSS" : `Enemy ${j + 1}`,
                     "Enemy",
@@ -364,7 +367,7 @@ export class GameState {
                 enemies: enemies,
                 reward: reward,
                 completed: false,
-                targetScore: 300 + (i * 150) + (this.anteCounter * 100)
+                targetScore: targetScore
             });
         }
 
@@ -373,21 +376,25 @@ export class GameState {
 
     /**
      * Get stats for encounter enemies based on type and ante scaling
+     * Base HP is set to half of targetScore for balanced gameplay
      */
-    getEncounterStats(type, anteScaling) {
+    getEncounterStats(type, anteScaling, targetScore) {
+        // Use half of targetScore as base HP for balanced enemy durability
+        const baseHp = Math.floor(targetScore / 2);
+
         let base = {
-            hp: 60, mp: 50, attack: 15, defense: 5,
+            hp: baseHp, mp: 50, attack: 15, defense: 5,
             specialAttack: 15, specialDefense: 5, speed: 10, accuracy: 100, luck: 5
         };
 
         if (type === "Stronger") {
             base = {
-                hp: 100, mp: 60, attack: 20, defense: 10,
+                hp: baseHp, mp: 60, attack: 20, defense: 10,
                 specialAttack: 20, specialDefense: 10, speed: 12, accuracy: 105, luck: 7
             };
         } else if (type === "Boss") {
             base = {
-                hp: 400, mp: 200, attack: 30, defense: 15,
+                hp: baseHp, mp: 200, attack: 30, defense: 15,
                 specialAttack: 30, specialDefense: 15, speed: 15, accuracy: 110, luck: 10
             };
         }

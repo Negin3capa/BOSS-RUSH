@@ -13,6 +13,40 @@ export default function EncounterSelectScene() {
     let selectedEncounter = gameState.currentEncounterIndex;
     let isTransitioning = false;
 
+    // Black overlay for seamless fade-in transition (starts fully opaque)
+    const blackOverlay = k.add([
+        k.rect(SCREEN_WIDTH, SCREEN_HEIGHT),
+        k.pos(0, 0),
+        k.color(0, 0, 0),
+        k.opacity(1),
+        k.z(200), // Higher than side panel's z(150)
+    ]);
+
+    // Fade out the black overlay for seamless transition
+    // Hold at full opacity for 1 second, then fade out over 0.5s
+    gsap.to(blackOverlay, {
+        opacity: 0,
+        duration: 0.5,
+        delay: 1.0,
+        ease: "power2.inOut",
+        onComplete: () => {
+            blackOverlay.destroy();
+            
+            // Animate cards swiping up into view with stagger
+            encounterCards.forEach((item, index) => {
+                gsap.to(item.card.pos, {
+                    y: 0, // Final position
+                    duration: 0.6,
+                    delay: index * 0.15, // Stagger each card
+                    ease: "power2.out",
+                    onComplete: () => {
+                        item.card.hasEntered = true;
+                    }
+                });
+            });
+        }
+    });
+
     // Background Nebula
     const bg = k.add([
         k.sprite("nebula"),
@@ -55,7 +89,7 @@ export default function EncounterSelectScene() {
     const cardHeight = 380;
     const cardSpacing = 280;
 
-    // Create encounter cards
+    // Create encounter cards (start off-screen below)
     gameState.encounters.forEach((encounter, index) => {
         const isCompleted = encounter.completed;
         const isCurrent = index === gameState.currentEncounterIndex;
@@ -63,22 +97,23 @@ export default function EncounterSelectScene() {
 
         const xOffset = (index - 1) * cardSpacing;
 
-        // Card container
+        // Card container - starts below screen for swipe-in animation
         const card = cardsContainer.add([
-            k.pos(xOffset, 0),
+            k.pos(xOffset, SCREEN_HEIGHT + 400), // Start below visible area
             k.anchor("center"),
             {
                 index: index,
                 isSelectable: isCurrent && !isCompleted,
                 baseY: 0,
+                hasEntered: false, // Track if card has finished entering
                 update() {
                     // Don't modify position during scene transition (let GSAP handle it)
                     if (isTransitioning) return;
                     
-                    // Hover animation for selectable cards
-                    if (this.isSelectable && index === selectedEncounter) {
+                    // Hover animation for selectable cards (only after entry animation)
+                    if (this.hasEntered && this.isSelectable && index === selectedEncounter) {
                         this.pos.y = this.baseY + Math.sin(k.time() * 4) * 5;
-                    } else {
+                    } else if (this.hasEntered) {
                         this.pos.y = this.baseY;
                     }
                 }

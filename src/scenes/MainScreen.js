@@ -1,10 +1,21 @@
 import k from "../kaplayCtx";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, UI } from "../constants";
 import { gameState } from "../state/GameState";
+import gsap from "gsap";
 
 export default function MainScreen() {
     let selectedOption = 0;
     const options = ["START", "QUIT"];
+    let isTransitioning = false;
+
+    // Black overlay for transition
+    const blackOverlay = k.add([
+        k.rect(SCREEN_WIDTH, SCREEN_HEIGHT),
+        k.pos(0, 0),
+        k.color(0, 0, 0),
+        k.opacity(0),
+        k.z(100),
+    ]);
 
     // Background Nebula
     const bg = k.add([
@@ -97,11 +108,27 @@ export default function MainScreen() {
         updateMenu();
     });
 
+    function startGame() {
+        if (isTransitioning) return;
+        isTransitioning = true;
+
+        gameState.initializeParty();
+        gameState.generateEncounters();
+
+        // Animate black overlay fade in
+        gsap.to(blackOverlay, {
+            opacity: 1,
+            duration: 0.5,
+            ease: "power2.inOut",
+            onComplete: () => {
+                k.go("encounter_select");
+            }
+        });
+    }
+
     k.onKeyPress("space", () => {
         if (options[selectedOption] === "START") {
-            gameState.initializeParty();
-            gameState.generateEncounters();
-            k.go("encounter_select");
+            startGame();
         } else if (options[selectedOption] === "QUIT") {
             k.debug.log("Quit selected");
         }
@@ -109,9 +136,7 @@ export default function MainScreen() {
 
     k.onKeyPress("enter", () => {
         if (options[selectedOption] === "START") {
-            gameState.initializeParty();
-            gameState.generateEncounters();
-            k.go("encounter_select");
+            startGame();
         }
     });
 }
