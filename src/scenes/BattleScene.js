@@ -47,10 +47,11 @@ export default function BattleScene() {
     // Create global side panel first (shows objectives and enemy name)
     const sidePanel = createSidePanel(gameState, { scene: "battle", initialTurnCount: turnCount });
     
-    // Update side panel with enemy name immediately
+    // Update side panel with enemy/boss info immediately
     const primaryEnemy = gameState.enemies.find(e => e.isBoss) || gameState.enemies[0];
     if (primaryEnemy) {
-        sidePanel.updateEnemyName(primaryEnemy.name);
+        // Pass the full boss object to enable mechanic display
+        sidePanel.updateEnemyName(primaryEnemy.name, primaryEnemy);
     }
 
     // UI Elements - Create but position off-screen initially
@@ -580,6 +581,8 @@ export default function BattleScene() {
             const result = boss.onTurnStart(battleContext);
             if (result && result.message) {
                 log.updateLog(result.message, true);
+                // Update side panel mechanic status
+                sidePanel.updateMechanicStatus(result.message, [255, 200, 100]);
             }
         });
 
@@ -631,6 +634,8 @@ export default function BattleScene() {
                 const result = boss.onTurnEnd(battleContext);
                 if (result && result.message) {
                     log.updateLog(result.message, true);
+                    // Update side panel mechanic status
+                    sidePanel.updateMechanicStatus(result.message, [255, 100, 100]);
                 }
             }
         });
@@ -887,10 +892,13 @@ export default function BattleScene() {
         sidePanel.updateAttempts(attemptsLeft);
         
         // Revive downed allies with 1 HP at the start of each new round
+        let revivedCount = 0;
         gameState.party.forEach(h => {
             if (h.isDead) {
                 h.isDead = false;
                 h.hp = 1;
+                revivedCount++;
+                log.updateLog(`${h.name} has been revived with 1 HP!`, true);
             }
         });
         
@@ -1316,10 +1324,11 @@ export default function BattleScene() {
         };
         bossEnemies.forEach(boss => {
             boss.onBattleStart(battleContext);
-            // Display boss mechanic description
+            // Display boss mechanic description in log
             if (boss.mechanicDescription) {
                 log.updateLog(`⚠️ ${boss.name}: ${boss.mechanicDescription}`, true);
             }
+            // Side panel already shows mechanic via updateEnemyName with boss object
         });
     }
 }
