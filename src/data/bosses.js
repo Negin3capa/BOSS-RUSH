@@ -101,14 +101,79 @@ export const BULWARK = {
 };
 
 /**
+ * Helper function to shuffle skills between all alive party members
+ * Collects all active and passive skills, shuffles them, and redistributes
+ */
+function shuffleAllPartySkills(party) {
+    const aliveMembers = party.filter(member => !member.isDead);
+    if (aliveMembers.length < 2) return []; // Need at least 2 members to shuffle
+
+    // Collect all active skills from all alive members
+    const allActiveSkills = [];
+    aliveMembers.forEach(member => {
+        if (member.activeSkills && member.activeSkills.length > 0) {
+            allActiveSkills.push(...member.activeSkills);
+        }
+    });
+
+    // Collect all passive skills from all alive members
+    const allPassiveSkills = [];
+    aliveMembers.forEach(member => {
+        if (member.passiveSkills && member.passiveSkills.length > 0) {
+            allPassiveSkills.push(...member.passiveSkills);
+        }
+    });
+
+    // Shuffle both pools
+    shuffleArray(allActiveSkills);
+    shuffleArray(allPassiveSkills);
+
+    // Redistribute skills evenly among alive members
+    const affectedMembers = [];
+    let activeSkillIndex = 0;
+    let passiveSkillIndex = 0;
+
+    aliveMembers.forEach(member => {
+        // Calculate how many skills this member should get
+        const originalActiveCount = member.activeSkills?.length || 0;
+        const originalPassiveCount = member.passiveSkills?.length || 0;
+
+        // Redistribute active skills
+        if (originalActiveCount > 0) {
+            member.activeSkills = allActiveSkills.slice(
+                activeSkillIndex,
+                activeSkillIndex + originalActiveCount
+            );
+            activeSkillIndex += originalActiveCount;
+        }
+
+        // Redistribute passive skills
+        if (originalPassiveCount > 0) {
+            member.passiveSkills = allPassiveSkills.slice(
+                passiveSkillIndex,
+                passiveSkillIndex + originalPassiveCount
+            );
+            passiveSkillIndex += originalPassiveCount;
+        }
+
+        // Update the skills alias for compatibility
+        member.skills = member.activeSkills;
+
+        affectedMembers.push(member.name);
+    });
+
+    return affectedMembers;
+}
+
+/**
  * THE TRICKSTER - Skill Shuffler
- * Mechanic: Shuffles a random party member's skills each turn
+ * Mechanic: Shuffles ALL party members' skills between each other each turn
  */
 export const TRICKSTER = {
     id: "trickster",
     name: "THE TRICKSTER",
     description: "A chaotic entity that revels in confusion.",
-    mechanicDescription: "Shuffles a random party member's skills each turn.",
+    mechanicDescription: "Shuffles ALL party members' skills between each other each turn (including passives).",
     types: [ATTRIBUTES.PSYCHIC, ATTRIBUTES.FAIRY],
     tier: BOSS_TIERS.EARLY,
     baseStats: {
@@ -139,14 +204,11 @@ export const TRICKSTER = {
     ],
     mechanics: {
         onTurnEnd: (boss, context) => {
-            // Shuffle a random party member's skills
-            const targetIndex = getRandomAlivePartyMemberIndex(context.party);
-            if (targetIndex !== -1) {
-                const target = context.party[targetIndex];
-                const originalSkills = [...target.skills];
-                target.skills = shuffleArray([...target.skills]);
-                context.log(`${boss.name} shuffles ${target.name}'s skills!`);
-                return { message: `SKILLS SHUFFLED: ${target.name}` };
+            // Shuffle skills between ALL party members
+            const affectedMembers = shuffleAllPartySkills(context.party);
+            if (affectedMembers.length > 0) {
+                context.log(`${boss.name} shuffles skills between all party members! Chaos reigns!`);
+                return { message: `CHAOS: Skills shuffled between all members!` };
             }
             return null;
         }

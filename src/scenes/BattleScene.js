@@ -29,6 +29,30 @@ export default function BattleScene() {
     // Command Memory
     let lastActionIndexDuringTurn = 0;
 
+    // Backup party skills at battle start (for Trickster mechanic)
+    function backupPartySkills() {
+        gameState.party.forEach(member => {
+            member._originalActiveSkills = [...member.activeSkills];
+            member._originalPassiveSkills = [...member.passiveSkills];
+        });
+    }
+
+    // Restore party skills when battle ends
+    function restorePartySkills() {
+        gameState.party.forEach(member => {
+            if (member._originalActiveSkills) {
+                member.activeSkills = [...member._originalActiveSkills];
+                member.skills = member.activeSkills; // Update alias
+            }
+            if (member._originalPassiveSkills) {
+                member.passiveSkills = [...member._originalPassiveSkills];
+            }
+            // Clean up backup properties
+            delete member._originalActiveSkills;
+            delete member._originalPassiveSkills;
+        });
+    }
+
     // Background Nebula
     const bg = k.add([
         k.sprite("nebula"),
@@ -964,6 +988,9 @@ export default function BattleScene() {
     function endGame(win) {
         turnPhase = "END";
 
+        // Restore party skills to their original state (undo Trickster shuffle)
+        restorePartySkills();
+
         // Handle EXP and Rewards
         let expReward = 0;
         let goldReward = 0;
@@ -1170,6 +1197,17 @@ export default function BattleScene() {
     }
 
     function gameRestart(newGame = false) {
+
+        // Revive downed party members with 1 HP after battle victory
+        if (!newGame) {
+            gameState.party.forEach(h => {
+                if (h.isDead) {
+                    h.isDead = false;
+                    h.hp = 1;
+                }
+            });
+        }
+        
         // Reset battle metrics
         gameState.scoringState.battleMetrics = {
             superEffectiveHits: 0,
@@ -1308,6 +1346,9 @@ export default function BattleScene() {
             ease: "power2.out"
         }, 1.3);
     }
+
+    // Backup party skills at battle start (before any Trickster shuffling can occur)
+    backupPartySkills();
 
     // Start entry animation after a brief delay to ensure everything is created
     k.wait(0.1).then(() => {
