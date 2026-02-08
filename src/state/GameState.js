@@ -1,7 +1,7 @@
 import { BaseCharacter } from "../entities/BaseCharacter";
 import { BossCharacter } from "../entities/BossCharacter";
 import { getRandomSkills, getWeightedRandomSkills, SKILL_DATA } from "../data/skills/index.js";
-import { getRandomBossForAnte } from "../data/bosses.js";
+import { getRandomBossForAnte, getBossById } from "../data/bosses.js";
 import { GAMEPLAY, ATTRIBUTES } from "../constants";
 import { k } from "../kaplayCtx";
 
@@ -680,7 +680,6 @@ export class GameState {
             // If this is a boss character, recreate it properly
             if (e instanceof BossCharacter || e.bossId) {
                 // Get the boss template and recreate
-                const { getBossById } = require("../data/bosses.js");
                 const bossTemplate = getBossById(e.bossId);
                 if (bossTemplate) {
                     const boss = new BossCharacter(bossTemplate, this.anteCounter);
