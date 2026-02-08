@@ -1,5 +1,6 @@
 import k from "../kaplayCtx";
 import { gameState } from "../state/GameState";
+import { BossCharacter } from "../entities/BossCharacter";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
 import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem, createTargetingInfo } from "../ui/BattleUI";
 import { createSidePanel } from "../ui/SidePanel";
@@ -528,7 +529,30 @@ export default function BattleScene() {
         selectedSkillIndex = 0;
         selectedAction = null;
 
-        while (currentHeroIndex < gameState.party.length && gameState.party[currentHeroIndex].isDead) currentHeroIndex++;
+        // Skip dead heroes and check for boss character locking mechanics
+        while (currentHeroIndex < gameState.party.length) {
+            const hero = gameState.party[currentHeroIndex];
+            if (hero.isDead) {
+                currentHeroIndex++;
+                continue;
+            }
+            
+            // BOSS MECHANIC: Check if any boss has locked this character
+            const lockingBoss = gameState.enemies.find(e => 
+                e instanceof BossCharacter && 
+                !e.isDead && 
+                e.isCharacterLocked(currentHeroIndex)
+            );
+            
+            if (lockingBoss) {
+                // Character is locked - auto-defend and skip
+                log.updateLog(`${hero.name} is DOMINATED by ${lockingBoss.name}! They cannot act!`, true);
+                playerActions.push({ type: "DEFEND", source: hero, target: hero });
+                currentHeroIndex++;
+            } else {
+                break;
+            }
+        }
 
         if (currentHeroIndex >= gameState.party.length) {
             turnPhase = "EXECUTING";
@@ -544,10 +568,35 @@ export default function BattleScene() {
     async function executeTurn() {
         menuSystem.hide();
 
+        // BOSS MECHANIC: Call onTurnStart for bosses before executing actions
+        const bossEnemies = gameState.enemies.filter(e => e instanceof BossCharacter && !e.isDead);
+        const battleContext = {
+            party: gameState.party,
+            enemies: gameState.enemies,
+            log: (msg) => log.updateLog(msg, true)
+        };
+        
+        bossEnemies.forEach(boss => {
+            const result = boss.onTurnStart(battleContext);
+            if (result && result.message) {
+                log.updateLog(result.message, true);
+            }
+        });
+
         // Phase 1: Collect Enemy Actions
         const allActions = [...playerActions];
         for (const enemy of gameState.enemies) {
             if (enemy.isDead) continue;
+            
+            // BOSS MECHANIC: Check if boss has custom action
+            if (enemy instanceof BossCharacter) {
+                const customAction = enemy.getCustomAction(battleContext);
+                if (customAction) {
+                    allActions.push(customAction);
+                    continue;
+                }
+            }
+            
             const enemyAction = await getEnemyAction(enemy);
             if (enemyAction) allActions.push(enemyAction);
         }
@@ -575,6 +624,16 @@ export default function BattleScene() {
             if (gameState.areEnemiesDefeated()) enemiesDefeated = true;
             if (gameState.isPartyDefeated()) partyDefeated = true;
         }
+
+        // BOSS MECHANIC: Call onTurnEnd for bosses
+        bossEnemies.forEach(boss => {
+            if (!boss.isDead) {
+                const result = boss.onTurnEnd(battleContext);
+                if (result && result.message) {
+                    log.updateLog(result.message, true);
+                }
+            }
+        });
 
         // NEW SCORING: Calculate turn-end score and update UI
         const turnScore = gameState.calculateTurnEndScore();
@@ -1246,4 +1305,21 @@ export default function BattleScene() {
     k.wait(0.1).then(() => {
         playEntryAnimation();
     });
+    
+    // BOSS MECHANIC: Call onBattleStart for any bosses
+    const bossEnemies = gameState.enemies.filter(e => e instanceof BossCharacter);
+    if (bossEnemies.length > 0) {
+        const battleContext = {
+            party: gameState.party,
+            enemies: gameState.enemies,
+            log: (msg) => log.updateLog(msg, true)
+        };
+        bossEnemies.forEach(boss => {
+            boss.onBattleStart(battleContext);
+            // Display boss mechanic description
+            if (boss.mechanicDescription) {
+                log.updateLog(`⚠️ ${boss.name}: ${boss.mechanicDescription}`, true);
+            }
+        });
+    }
 }

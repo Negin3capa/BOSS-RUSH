@@ -1,5 +1,7 @@
 import { BaseCharacter } from "../entities/BaseCharacter";
+import { BossCharacter } from "../entities/BossCharacter";
 import { getRandomSkills, getWeightedRandomSkills, SKILL_DATA } from "../data/skills/index.js";
+import { getRandomBossForAnte } from "../data/bosses.js";
 import { GAMEPLAY, ATTRIBUTES } from "../constants";
 import { k } from "../kaplayCtx";
 
@@ -528,7 +530,7 @@ export class GameState {
      * Generate 3 encounters for the current ante
      * - Encounter 1: Simple (1 weak enemy)
      * - Encounter 2: Stronger (2 enemies or stronger single)
-     * - Encounter 3: Boss (1 powerful boss)
+     * - Encounter 3: Boss (1 unique boss with mechanics)
      */
     generateEncounters() {
         this.encounters = [];
@@ -546,36 +548,41 @@ export class GameState {
             const targetScore = 300 + (i * 150) + (this.anteCounter * 100);
             
             const enemies = [];
-            for (let j = 0; j < count; j++) {
-                const stats = this.getEncounterStats(type, anteScaling, targetScore);
-                const enemy = new BaseCharacter(
-                    i === 2 ? "BOSS" : `Enemy ${j + 1}`,
-                    "Enemy",
-                    stats
-                );
-                enemy.isBoss = (i === 2);
-                enemy.level = Math.max(1, Math.floor(this.averagePartyLevel + this.anteCounter));
+            
+            // Boss encounter - use BossCharacter with unique mechanics
+            if (i === 2) {
+                const bossTemplate = getRandomBossForAnte(this.anteCounter);
+                const boss = new BossCharacter(bossTemplate, this.anteCounter);
+                enemies.push(boss);
+            } else {
+                // Regular encounters - use BaseCharacter
+                for (let j = 0; j < count; j++) {
+                    const stats = this.getEncounterStats(type, anteScaling, targetScore);
+                    const enemy = new BaseCharacter(
+                        `Enemy ${j + 1}`,
+                        "Enemy",
+                        stats
+                    );
+                    enemy.isBoss = false;
+                    enemy.level = Math.max(1, Math.floor(this.averagePartyLevel + this.anteCounter));
 
-                // Assign random types
-                const t1 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-                enemy.types = [t1];
-                enemy.attribute = t1;
-                if (Math.random() > 0.6) {
-                    const t2 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-                    if (t2 !== t1) enemy.types.push(t2);
-                }
+                    // Assign random types
+                    const t1 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+                    enemy.types = [t1];
+                    enemy.attribute = t1;
+                    if (Math.random() > 0.6) {
+                        const t2 = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+                        if (t2 !== t1) enemy.types.push(t2);
+                    }
 
-                // Assign flavored name
-                const noun = CREATURE_NOUNS[Math.floor(Math.random() * CREATURE_NOUNS.length)];
-                const typeLabel = enemy.types[0].charAt(0).toUpperCase() + enemy.types[0].slice(1).toLowerCase();
-                if (i === 2) {
-                    enemy.name = `GREATER ${typeLabel.toUpperCase()} ${noun.toUpperCase()}`;
-                } else {
+                    // Assign flavored name
+                    const noun = CREATURE_NOUNS[Math.floor(Math.random() * CREATURE_NOUNS.length)];
+                    const typeLabel = enemy.types[0].charAt(0).toUpperCase() + enemy.types[0].slice(1).toLowerCase();
                     enemy.name = `${typeLabel} ${noun}`;
-                }
 
-                this.setupSkills(enemy, "ANY");
-                enemies.push(enemy);
+                    this.setupSkills(enemy, "ANY");
+                    enemies.push(enemy);
+                }
             }
 
             // Calculate reward
@@ -588,7 +595,9 @@ export class GameState {
                 enemies: enemies,
                 reward: reward,
                 completed: false,
-                targetScore: targetScore
+                targetScore: targetScore,
+                isBossEncounter: i === 2,
+                bossTemplate: i === 2 ? enemies[0] : null
             });
         }
 
@@ -667,9 +676,20 @@ export class GameState {
         if (!encounter) return false;
         
         // Deep copy enemies from encounter
-        // Use raw stats directly to avoid double-scaling
         this.enemies = encounter.enemies.map(e => {
-            const copy = new BaseCharacter(e.name, e.role, {
+            // If this is a boss character, recreate it properly
+            if (e instanceof BossCharacter || e.bossId) {
+                // Get the boss template and recreate
+                const { getBossById } = require("../data/bosses.js");
+                const bossTemplate = getBossById(e.bossId);
+                if (bossTemplate) {
+                    const boss = new BossCharacter(bossTemplate, this.anteCounter);
+                    return boss;
+                }
+            }
+            
+            // Regular enemy - use BaseCharacter
+            const copy = new BaseCharacter(e.name, e.className || "Enemy", {
                 hp: e.rawHp ?? e.maxHp,
                 mp: e.rawJuice ?? e.maxMp,
                 attack: e.rawAttack ?? e.attack,

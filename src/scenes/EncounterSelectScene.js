@@ -210,9 +210,43 @@ export default function EncounterSelectScene() {
 
         // Enemy names
         const namesY = previewY + 50;
-        const displayName = encounter.enemies.length === 1 
-            ? encounter.enemies[0].name 
-            : `${encounter.enemies.length} Enemies`;
+        let displayName;
+        
+        // BOSS DISPLAY: Show boss name and mechanic description for boss encounters
+        if (encounter.isBossEncounter && encounter.bossTemplate) {
+            const boss = encounter.bossTemplate;
+            displayName = boss.name;
+            
+            // Show mechanic description below name
+            if (boss.mechanicDescription) {
+                card.add([
+                    k.text(boss.mechanicDescription.substring(0, 40) + "...", { 
+                        size: 10, 
+                        font: "Inter", 
+                        width: cardWidth - 20, 
+                        align: "center" 
+                    }),
+                    k.pos(0, namesY + 25),
+                    k.anchor("center"),
+                    k.color(255, 180, 100),
+                ]);
+            }
+            
+            // ELITE indicator
+            if (boss.isElite) {
+                card.add([
+                    k.text("👑 ELITE", { size: 16, font: "Viga" }),
+                    k.pos(0, namesY - 35),
+                    k.anchor("center"),
+                    k.color(255, 215, 0),
+                    k.outline(3, [0, 0, 0]),
+                ]);
+            }
+        } else {
+            displayName = encounter.enemies.length === 1 
+                ? encounter.enemies[0].name 
+                : `${encounter.enemies.length} Enemies`;
+        }
         
         card.add([
             k.text(displayName, { size: 14, font: "Inter", width: cardWidth - 20, align: "center" }),
@@ -254,7 +288,7 @@ export default function EncounterSelectScene() {
             k.color(180, 180, 200),
         ]);
 
-        const rewardText = "💰".repeat(Math.min(5, Math.ceil(encounter.reward / 25)));
+        const rewardText = "$".repeat(Math.min(5, Math.ceil(encounter.reward / 25)));
         card.add([
             k.text(`${rewardText} +${encounter.reward}`, { size: 16, font: "Viga" }),
             k.pos(0, rewardY + 18),
