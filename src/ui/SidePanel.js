@@ -162,6 +162,64 @@ function createBattleContent(container, gameState, initialTurnCount) {
         k.pos(20, 330),
     ]);
 
+    // NEW: Base Score × Multiplier Display (between Score at least and Round score)
+    const scoringDisplayContainer = container.add([
+        k.pos(30, 220),
+    ]);
+
+    // Blue box for Base Score
+    const baseScoreBox = scoringDisplayContainer.add([
+        k.rect(110, 40, { radius: 6 }),
+        k.pos(0, 0),
+        k.color(60, 120, 200), // Blue
+        k.outline(3, [255, 255, 255]),
+    ]);
+
+    const baseScoreText = scoringDisplayContainer.add([
+        k.text("0", { size: 22, font: "Viga" }),
+        k.pos(55, 20),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.z(85),
+        {
+            update() {
+                const state = gameState.getTurnScoringState();
+                this.text = state.baseScore.toString();
+            }
+        }
+    ]);
+
+    // Multiplication symbol
+    scoringDisplayContainer.add([
+        k.text("×", { size: 24, font: "Viga" }),
+        k.pos(130, 20),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.z(85),
+    ]);
+
+    // Red box for Multiplier
+    const multiplierBox = scoringDisplayContainer.add([
+        k.rect(110, 40, { radius: 6 }),
+        k.pos(150, 0),
+        k.color(200, 60, 60), // Red
+        k.outline(3, [255, 255, 255]),
+    ]);
+
+    const multiplierText = scoringDisplayContainer.add([
+        k.text("1.0", { size: 22, font: "Viga" }),
+        k.pos(205, 20),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.z(85),
+        {
+            update() {
+                const state = gameState.getTurnScoringState();
+                this.text = state.multiplier.toFixed(1) + "x";
+            }
+        }
+    ]);
+
     const objectiveLabels = [];
     const updateObjectives = () => {
         objectiveLabels.forEach(l => k.destroy(l));

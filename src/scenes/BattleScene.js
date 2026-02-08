@@ -3,7 +3,7 @@ import { gameState } from "../state/GameState";
 import { COLORS, SCREEN_WIDTH, SCREEN_HEIGHT, GAMEPLAY, LAYOUT, ATTRIBUTE_COLORS, ATTRIBUTES, UI } from "../constants";
 import { createBattleUI, createMessageLog, createTurnCounter, createRoundCounter, createMenuSystem, createTargetingInfo } from "../ui/BattleUI";
 import { createSidePanel } from "../ui/SidePanel";
-import { RARITY_COLORS } from "../data/skills";
+import { RARITY_COLORS } from "../data/skills/index.js";
 import gsap from "gsap";
 
 export default function BattleScene() {
@@ -576,6 +576,13 @@ export default function BattleScene() {
             if (gameState.isPartyDefeated()) partyDefeated = true;
         }
 
+        // NEW SCORING: Calculate turn-end score and update UI
+        const turnScore = gameState.calculateTurnEndScore();
+        if (turnScore > 0) {
+            sidePanel.updateRoundScore(gameState.scoringState.roundScore);
+            log.updateLog(`Turn Score: ${turnScore} points!`, true);
+        }
+        
         // After all actions are processed, check victory/defeat
         if (enemiesDefeated) endGame(true);
         else if (partyDefeated) endGame(false);
@@ -700,13 +707,17 @@ export default function BattleScene() {
                     spawnNumbers(getTargetPos(t), result.damage, result.crit ? 50 : 32, damageColor);
                     shakeScreen(result.crit ? 10 : 5);
 
-                    // Add score based on damage dealt (1 point per damage dealt) - only for player party
+                    // NEW SCORING: Calculate and accumulate damage score - only for player party
                     const isPlayerAction = gameState.party.includes(source);
-                    if (isPlayerAction) {
-                        const scoreAdded = gameState.addScore(result.damage);
-                        if (scoreAdded) {
-                            sidePanel.updateRoundScore(gameState.scoringState.roundScore);
-                        }
+                    if (isPlayerAction && skill) {
+                        const scoreData = gameState.calculateDamageScore(
+                            result.damage,
+                            source,
+                            skill,
+                            result.crit,
+                            result.mult
+                        );
+                        gameState.applyCalculatedScore(scoreData);
                     }
                 }
                 await k.wait(0.3);
@@ -716,6 +727,13 @@ export default function BattleScene() {
             source.startAction();
             source.defend();
             spawnParticles(targetPos, "🛡️", [255, 255, 150]);
+            
+            // NEW SCORING: Defend action gives small base score (damage prevented is tracked separately)
+            const isPlayerAction = gameState.party.includes(source);
+            if (isPlayerAction) {
+                // Defend gives a small base score of 10 (no multipliers)
+                gameState.accumulateBaseScore(10);
+            }
         } else if (type === "ITEM" || (type === "SKILL" && skill.type === "Heal")) {
             // Start action - reset hurt state
             source.startAction();
@@ -732,6 +750,18 @@ export default function BattleScene() {
         if (skill) {
             await k.wait(0.4);
             log.updateLog(`${source.name} used ${skillNameFormatted}.`, true);
+        }
+        
+        // NEW SCORING: Healing score - only for player party
+        const isPlayerAction = gameState.party.includes(source);
+        if (isPlayerAction && skill) {
+            const scoreData = gameState.calculateHealScore(
+                amount * targets.length,
+                targets.length,
+                source,
+                skill
+            );
+            gameState.applyCalculatedScore(scoreData);
         }
         } else if (type === "SKILL" && (skill.type === "Buff" || skill.type === "Debuff")) {
             const targets = (target === "ALL_ALLIES") ? gameState.party.filter(p => !p.isDead) :
@@ -766,6 +796,19 @@ export default function BattleScene() {
             const change = isBuff ? "increased" : "decreased";
             const statName = skill.effect ? skill.effect.stat : "stats";
             log.updateLog(`${target.name || "Target"}'s ${statName} ${change}!`, true);
+            
+            // NEW SCORING: Buff/Debuff score - only for player party
+            const isPlayerAction = gameState.party.includes(source);
+            if (isPlayerAction && skill && skill.effect) {
+                const scoreData = gameState.calculateBuffDebuffScore(
+                    skill.effect.amount,
+                    3, // Duration is 3 turns
+                    targets.length,
+                    source,
+                    skill
+                );
+                gameState.applyCalculatedScore(scoreData);
+            }
         }
 
         if (type === "SKILL" && skill) source.costJuice(skill.mpCost);

@@ -1,5 +1,5 @@
 import { ATTRIBUTES } from "../constants";
-import { RARITIES } from "./skills";
+import { RARITIES } from "./skills/index.js";
 
 export const EQUIPMENT_TYPES = {
     WEAPON: "Weapon",

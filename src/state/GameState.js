@@ -1,5 +1,5 @@
 import { BaseCharacter } from "../entities/BaseCharacter";
-import { getRandomSkills, getWeightedRandomSkills, SKILL_DATA } from "../data/skills";
+import { getRandomSkills, getWeightedRandomSkills, SKILL_DATA } from "../data/skills/index.js";
 import { GAMEPLAY, ATTRIBUTES } from "../constants";
 import { k } from "../kaplayCtx";
 
@@ -30,6 +30,12 @@ export class GameState {
                 partyDeaths: 0,
                 totalTurns: 0
             }
+        };
+        // Turn-based scoring accumulator
+        this.turnScoring = {
+            baseScore: 0,
+            multiplier: 1.0,
+            actionLog: []
         };
         // Ante system - increments on boss defeat, win at 8/8
         this.anteCounter = 1;
@@ -112,7 +118,7 @@ export class GameState {
             "SOL": ["Intimidate", "Cosmic Ray", "Shadow Claw", "Slash"],
             "ALLOY": ["Thunder", "Fortify", "Shield Bash", "Chain Lightning"],
             "SABRINA": ["Heal", "Fireball", "Pixie Dust", "Shadow Strike"],
-            "MAX": ["Haste", "Splash", "Earthquake", "Light Beam"]
+            "MAX": ["Feint", "Splash", "Earthquake", "Light Beam"]
         };
         return startingSkillsets[charName] || null;
     }
@@ -231,7 +237,10 @@ export class GameState {
         this.scoringState.roundScore = 0;
         // Only set default targetScore if not already set (preserves encounter target scores)
         if (!this.scoringState.targetScore || this.scoringState.targetScore === 0) {
-            this.scoringState.targetScore = 1000 + (this.roundCounter * 200);
+            // NEW: Easier early rounds, scaling difficulty curve
+        // Formula: 400 + (round² * 18) gives:
+        // Round 1: ~418, Round 3: ~562, Round 5: ~850, Round 8: ~1552, Round 10: ~2200
+        this.scoringState.targetScore = Math.floor(400 + (this.roundCounter * this.roundCounter * 18));
         }
     }
 
@@ -242,6 +251,192 @@ export class GameState {
         }
         this.scoringState.roundScore += amount;
         return true; // Score added successfully
+    }
+
+    // ============================================
+    // NEW SCORING SYSTEM - Turn-based accumulator
+    // ============================================
+
+    /**
+     * Accumulate base score during a turn
+     * @param {number} amount - Base score to add
+     */
+    accumulateBaseScore(amount) {
+        if (this.scoringLocked) return false;
+        this.turnScoring.baseScore += Math.floor(amount);
+        return true;
+    }
+
+    /**
+     * Accumulate multiplier during a turn
+     * @param {number} multiplier - Multiplier to apply (e.g., 1.5 for STAB, 2.0 for crit)
+     */
+    accumulateMultiplier(multiplier) {
+        if (this.scoringLocked) return false;
+        // Additive stacking: add the bonus amount (multiplier - 1) instead of multiplying
+        // This prevents exponential score growth while still rewarding good play
+        this.turnScoring.multiplier += (multiplier - 1);
+        return true;
+    }
+
+    /**
+     * Log an action for the turn
+     * @param {Object} actionData - Details about the action
+     */
+    logScoringAction(actionData) {
+        this.turnScoring.actionLog.push(actionData);
+    }
+
+    /**
+     * Calculate the final score at turn end and reset accumulator
+     * @returns {number} The final score to add to round score
+     */
+    calculateTurnEndScore() {
+        if (this.scoringLocked) {
+            this.resetTurnScoring();
+            return 0;
+        }
+        const finalScore = Math.floor(this.turnScoring.baseScore * this.turnScoring.multiplier);
+        if (finalScore > 0) {
+            this.scoringState.roundScore += finalScore;
+        }
+        this.resetTurnScoring();
+        return finalScore;
+    }
+
+    /**
+     * Reset the turn scoring accumulator
+     */
+    resetTurnScoring() {
+        this.turnScoring.baseScore = 0;
+        this.turnScoring.multiplier = 1.0;
+        this.turnScoring.actionLog = [];
+    }
+
+    /**
+     * Get current turn scoring state for UI display
+     * @returns {Object} { baseScore, multiplier }
+     */
+    getTurnScoringState() {
+        return {
+            baseScore: this.turnScoring.baseScore,
+            multiplier: this.turnScoring.multiplier,
+            projectedScore: Math.floor(this.turnScoring.baseScore * this.turnScoring.multiplier)
+        };
+    }
+
+    /**
+     * Calculate if a skill gets STAB (Same Type Attack Bonus)
+     * @param {Object} source - The character using the skill
+     * @param {string} skillAttribute - The skill's attribute/type
+     * @returns {boolean} True if STAB applies
+     */
+    hasSTAB(source, skillAttribute) {
+        return source && source.types && source.types.includes(skillAttribute);
+    }
+
+    /**
+     * Calculate score for damage dealt
+     * @param {number} damage - Damage dealt
+     * @param {Object} source - Attacker character
+     * @param {Object} skill - Skill used
+     * @param {boolean} isCrit - Was it a critical hit
+     * @param {number} typeMultiplier - Type effectiveness multiplier
+     * @returns {Object} { baseScore, multipliersApplied }
+     */
+    calculateDamageScore(damage, source, skill, isCrit, typeMultiplier) {
+        const baseScore = damage;
+        const multipliers = [];
+
+        // STAB bonus for all skill types
+        if (skill && this.hasSTAB(source, skill.attribute)) {
+            multipliers.push({ type: 'STAB', value: 1.5 });
+        }
+
+        // Super effective bonus (typeMultiplier > 1 means super effective)
+        if (typeMultiplier > 1.5) {
+            multipliers.push({ type: 'SUPER_EFFECTIVE', value: 2.0 });
+        }
+
+        // Critical hit bonus
+        if (isCrit) {
+            multipliers.push({ type: 'CRITICAL', value: 2.0 });
+        }
+
+        return { baseScore, multipliers };
+    }
+
+    /**
+     * Calculate score for healing
+     * @param {number} healAmount - HP healed
+     * @param {number} targetCount - Number of targets healed
+     * @param {Object} source - Healer character
+     * @param {Object} skill - Healing skill used
+     * @returns {Object} { baseScore, multipliersApplied }
+     */
+    calculateHealScore(healAmount, targetCount, source, skill) {
+        // Healing score = total HP healed / number of targets
+        const baseScore = Math.floor(healAmount / Math.max(1, targetCount));
+        const multipliers = [];
+
+        // STAB bonus applies to healing too
+        if (skill && this.hasSTAB(source, skill.attribute)) {
+            multipliers.push({ type: 'STAB', value: 1.5 });
+        }
+
+        return { baseScore, multipliers };
+    }
+
+    /**
+     * Calculate score for buffs/debuffs
+     * @param {number} statMultiplier - The stat multiplier (e.g., 1.5 for +50%)
+     * @param {number} duration - Duration in turns
+     * @param {number} targetCount - Number of targets affected
+     * @param {Object} source - Character applying the buff/debuff
+     * @param {Object} skill - Buff/Debuff skill used
+     * @returns {Object} { baseScore, multipliersApplied }
+     */
+    calculateBuffDebuffScore(statMultiplier, duration, targetCount, source, skill) {
+        // Buff/Debuff score = statMultiplier * duration * targets
+        const baseScore = Math.floor(statMultiplier * duration * Math.max(1, targetCount));
+        const multipliers = [];
+
+        // STAB bonus applies to buffs/debuffs too
+        if (skill && this.hasSTAB(source, skill.attribute)) {
+            multipliers.push({ type: 'STAB', value: 1.5 });
+        }
+
+        return { baseScore, multipliers };
+    }
+
+    /**
+     * Calculate score for defending
+     * @param {number} damagePrevented - Amount of damage prevented by defending
+     * @returns {Object} { baseScore, multipliersApplied }
+     */
+    calculateDefendScore(damagePrevented) {
+        // Defend score = damage prevented * 0.5
+        const baseScore = Math.floor(damagePrevented * 0.5);
+        return { baseScore, multipliers: [] };
+    }
+
+    /**
+     * Apply calculated score to turn accumulator
+     * @param {Object} scoreData - Result from calculateDamageScore, calculateHealScore, etc.
+     */
+    applyCalculatedScore(scoreData) {
+        // Add base score
+        this.accumulateBaseScore(scoreData.baseScore);
+
+        // Apply all multipliers
+        if (scoreData.multipliers) {
+            scoreData.multipliers.forEach(m => {
+                this.accumulateMultiplier(m.value);
+            });
+        }
+
+        // Log the action
+        this.logScoringAction(scoreData);
     }
 
     decrementAttempts() {

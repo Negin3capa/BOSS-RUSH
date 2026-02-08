@@ -1,6 +1,6 @@
 import k from "../kaplayCtx";
 import { COLORS, LAYOUT, SCREEN_WIDTH, SCREEN_HEIGHT, UI, ATTRIBUTE_COLORS } from "../constants";
-import { RARITY_COLORS } from "../data/skills";
+import { RARITY_COLORS } from "../data/skills/index.js";
 import gsap from "gsap";
 
 export function createBattleUI(gameState, initialTurnCount = 1) {
