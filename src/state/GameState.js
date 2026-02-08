@@ -1,5 +1,5 @@
 import { BaseCharacter } from "../entities/BaseCharacter";
-import { getRandomSkills, getWeightedRandomSkills } from "../data/skills";
+import { getRandomSkills, getWeightedRandomSkills, SKILL_DATA } from "../data/skills";
 import { GAMEPLAY, ATTRIBUTES } from "../constants";
 import { k } from "../kaplayCtx";
 
@@ -47,22 +47,22 @@ export class GameState {
         this.roundCounter = 1;
         this.scalingFactor = 1.0;
 
-        // EDY - Dark/Star
-        const sol = new BaseCharacter("EDY", "Hero", {
+        // SOL - Dark/Star
+        const sol = new BaseCharacter("SOL", "Hero", {
             hp: 100, mp: 50, attack: 15, defense: 10,
             specialAttack: 15, specialDefense: 10, speed: 12, accuracy: 105, luck: 10
         });
         sol.types = [ATTRIBUTES.DARK, ATTRIBUTES.STAR];
-        this.setupSkills(sol, "Hero");
+        this.setupSkills(sol, "Hero", "SOL");
         this.party.push(sol);
 
-        // ENZO - Steel/Light
-        const alloy = new BaseCharacter("ENZO", "Tank", {
+        // ALLOY - Electric/Steel
+        const alloy = new BaseCharacter("ALLOY", "Tank", {
             hp: 150, mp: 30, attack: 12, defense: 15,
             specialAttack: 8, specialDefense: 15, speed: 8, accuracy: 95, luck: 5
         });
-        alloy.types = [ATTRIBUTES.STEEL, ATTRIBUTES.LIGHT];
-        this.setupSkills(alloy, "Tank");
+        alloy.types = [ATTRIBUTES.ELECTRIC, ATTRIBUTES.STEEL];
+        this.setupSkills(alloy, "Tank", "ALLOY");
         this.party.push(alloy);
 
         // SABRINA - Fairy/Fire
@@ -71,24 +71,50 @@ export class GameState {
             specialAttack: 25, specialDefense: 10, speed: 10, accuracy: 100, luck: 8
         });
         saber.types = [ATTRIBUTES.FAIRY, ATTRIBUTES.FIRE];
-        this.setupSkills(saber, "Mage");
+        this.setupSkills(saber, "Mage", "SABRINA");
         this.party.push(saber);
 
-        // MAX - Flying/Rock
+        // MAX - Light/Water
         const max = new BaseCharacter("MAX", "Rogue", {
             hp: 80, mp: 40, attack: 20, defense: 8,
             specialAttack: 12, specialDefense: 8, speed: 18, accuracy: 110, luck: 15
         });
-        max.types = [ATTRIBUTES.FLYING, ATTRIBUTES.ROCK];
-        this.setupSkills(max, "Rogue");
+        max.types = [ATTRIBUTES.LIGHT, ATTRIBUTES.WATER];
+        this.setupSkills(max, "Rogue", "MAX");
         this.party.push(max);
     }
 
-    setupSkills(char, className) {
-        // Fetch 4 Actives and 4 Passives using weighted randomness
-        char.activeSkills = getWeightedRandomSkills(className, 4, 0, "ACTIVE");
+    setupSkills(char, className, charName = null) {
+        // If this is a party member with a specific starting skillset, assign it
+        if (charName && this.getStartingSkills(charName)) {
+            const startingSkills = this.getStartingSkills(charName);
+            char.activeSkills = startingSkills.map(skillName => 
+                SKILL_DATA.find(s => s.name === skillName) || getWeightedRandomSkills(className, 1, 0, "ACTIVE")[0]
+            ).filter(Boolean);
+            // Fill any missing slots with random skills
+            while (char.activeSkills.length < 4) {
+                const randomSkill = getWeightedRandomSkills(className, 1, 0, "ACTIVE")[0];
+                if (randomSkill && !char.activeSkills.find(s => s.id === randomSkill.id)) {
+                    char.activeSkills.push(randomSkill);
+                }
+            }
+        } else {
+            // Fetch 4 Actives using weighted randomness for enemies/non-party
+            char.activeSkills = getWeightedRandomSkills(className, 4, 0, "ACTIVE");
+        }
+        // Fetch 4 Passives using weighted randomness
         char.passiveSkills = getWeightedRandomSkills(className, 4, 0, "Passive");
         char.skills = char.activeSkills; // Compatibility for UI
+    }
+
+    getStartingSkills(charName) {
+        const startingSkillsets = {
+            "SOL": ["Intimidate", "Cosmic Ray", "Shadow Claw", "Slash"],
+            "ALLOY": ["Thunder", "Fortify", "Shield Bash", "Chain Lightning"],
+            "SABRINA": ["Heal", "Fireball", "Pixie Dust", "Shadow Strike"],
+            "MAX": ["Haste", "Splash", "Earthquake", "Light Beam"]
+        };
+        return startingSkillsets[charName] || null;
     }
 
     get averagePartyLevel() {

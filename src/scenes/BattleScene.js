@@ -784,6 +784,13 @@ export default function BattleScene() {
         const attemptsLeft = gameState.decrementAttempts();
         sidePanel.updateAttempts(attemptsLeft);
         
+        // Revive downed allies with 1 HP at the start of each new round
+        gameState.party.forEach(h => {
+            if (h.isDead) {
+                h.isDead = false;
+                h.hp = 1;
+            }
+        });
         
         gameState.party.forEach(h => h.resetTurn());
         gameState.enemies.forEach(e => e.resetTurn());

@@ -51,6 +51,11 @@ const HERO_SKILLS = [
     createSkill("h1_3", "Pommel Strike", "Hero", "Damage", ATTRIBUTES.NORMAL, 4, 15, TARGETS.ONE_ENEMY, "Stuns with the sword hilt.", RARITIES.COMMON, null, false, "Physical"),
     createSkill("h1_4", "Thrust", "Hero", "Damage", ATTRIBUTES.NORMAL, 6, 30, TARGETS.ONE_ENEMY, "A focused forward thrust.", RARITIES.COMMON, null, false, "Physical"),
 
+    // Starting skills for Sol
+    createSkill("h_start_1", "Intimidate", "Hero", "Debuff", ATTRIBUTES.DARK, 8, 0, TARGETS.ONE_ENEMY, "Lowers enemy's attack.", RARITIES.COMMON, { stat: "attack", amount: 0.8 }, false, "Special"),
+    createSkill("h_start_2", "Cosmic Ray", "Hero", "Damage", ATTRIBUTES.STAR, 12, 45, TARGETS.ONE_ENEMY, "A beam of cosmic energy.", RARITIES.UNCOMMON, null, false, "Special"),
+    createSkill("h_start_3", "Shadow Claw", "Hero", "Damage", ATTRIBUTES.GHOST, 10, 35, TARGETS.ONE_ENEMY, "A spectral claw strike.", RARITIES.UNCOMMON, null, false, "Physical"),
+
     createSkill("h2", "Flame Strike", "Hero", "Damage", ATTRIBUTES.FIRE, 8, 35, TARGETS.ONE_ENEMY, "A burning strike.", RARITIES.UNCOMMON, null, false, "Physical"),
     createSkill("h2_2", "Water Slash", "Hero", "Damage", ATTRIBUTES.WATER, 8, 35, TARGETS.ONE_ENEMY, "A fluid water blade.", RARITIES.UNCOMMON, null, false, "Physical"),
     createSkill("h2_3", "Spark Blade", "Hero", "Damage", ATTRIBUTES.ELECTRIC, 8, 35, TARGETS.ONE_ENEMY, "Electrified edge.", RARITIES.UNCOMMON, null, false, "Physical"),
@@ -109,6 +114,9 @@ const MAGE_SKILLS = [
     createSkill("m1_3", "Splash", "Mage", "Damage", ATTRIBUTES.WATER, 10, 40, TARGETS.ONE_ENEMY, "Small wave of water.", RARITIES.COMMON, null, false, "Special"),
     createSkill("m1_4", "Ember", "Mage", "Damage", ATTRIBUTES.FIRE, 8, 30, TARGETS.ALL_ENEMIES, "Small sparks.", RARITIES.COMMON, null, false, "Special"),
 
+    // Starting skill for Sabrina
+    createSkill("m_start_1", "Pixie Dust", "Mage", "Buff", ATTRIBUTES.FAIRY, 12, 0, TARGETS.ALL_ALLIES, "Raises party speed with magical dust.", RARITIES.UNCOMMON, { stat: "speed", amount: 1.25 }, false, "Special"),
+
     createSkill("m3", "Thunder", "Mage", "Damage", ATTRIBUTES.ELECTRIC, 12, 45, TARGETS.ONE_ENEMY, "Lightning strike.", RARITIES.UNCOMMON, null, false, "Special"),
     createSkill("m4", "Dark Orb", "Mage", "Damage", ATTRIBUTES.DARK, 15, 50, TARGETS.ONE_ENEMY, "Dark magic.", RARITIES.UNCOMMON, null, false, "Special"),
     createSkill("m2_3", "Hydro Pump", "Mage", "Damage", ATTRIBUTES.WATER, 15, 55, TARGETS.ONE_ENEMY, "Fast water jet.", RARITIES.UNCOMMON, null, false, "Special"),
@@ -133,6 +141,9 @@ const ROGUE_SKILLS = [
     createSkill("r1", "Quick Stab", "Rogue", "Damage", ATTRIBUTES.NORMAL, 5, 20, TARGETS.ONE_ENEMY, "Very fast poke.", RARITIES.COMMON, null, true, "Physical"),
     createSkill("r1_2", "Snatch", "Rogue", "Damage", ATTRIBUTES.NORMAL, 6, 18, TARGETS.ONE_ENEMY, "Steal opportunity.", RARITIES.COMMON, null, true, "Physical"),
     createSkill("r1_3", "Feint", "Rogue", "Buff", ATTRIBUTES.NORMAL, 10, 0, TARGETS.SELF, "Raise Luck.", RARITIES.COMMON, { stat: "luck", amount: 1.3 }, true, "Special"),
+
+    // Starting skill for Max
+    createSkill("r_start_1", "Haste", "Rogue", "Buff", ATTRIBUTES.WIND, 10, 0, TARGETS.SELF, "Greatly increases own speed.", RARITIES.UNCOMMON, { stat: "speed", amount: 1.5 }, false, "Special"),
 
     createSkill("r3", "Venom Edge", "Rogue", "Damage", ATTRIBUTES.POISON, 10, 30, TARGETS.ONE_ENEMY, "Coat blade in venom.", RARITIES.UNCOMMON, null, false, "Physical"),
     createSkill("r2_2", "Ghost Step", "Rogue", "Buff", ATTRIBUTES.GHOST, 15, 0, TARGETS.SELF, "Raise Speed greatly.", RARITIES.UNCOMMON, { stat: "speed", amount: 1.4 }, true, "Special"),
